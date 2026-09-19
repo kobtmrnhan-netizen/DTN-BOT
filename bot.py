@@ -7197,6 +7197,104 @@ async def word_players_callback(
 # ROUTER CALLBACK GAME NỐI CHỮ
 # ============================================================
 
+async def process_word_game(update, context):
+    if not is_group(update):
+        return
+
+    message = update.effective_message
+
+    if not message:
+        return
+
+    if not message.text:
+        return
+
+    text = message.text.strip()
+
+    if not text:
+        return
+
+    if text.startswith("/"):
+        return
+
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+
+    if not user:
+        return
+
+    game = get_word_game(chat_id)
+
+    # Không có game → im lặng
+    if not game:
+        return
+
+    # Chỉ xử lý khi game đang chơi
+    if game.get("status") != "playing":
+        return
+
+    # Không phải người chơi → im lặng
+    if user.id not in game.get("players", {}):
+        return
+
+    current_user_id = get_current_word_player(game)
+
+    # Không đúng lượt → im lặng
+    if user.id != current_user_id:
+        return
+
+    current_word = game.get("current_word", "")
+
+    if not is_valid_chain_word(
+        current_word,
+        text
+    ):
+        try:
+            await message.reply_text(
+                "❌ Từ không hợp lệ.\n"
+                f"🔤 Phải bắt đầu bằng: "
+                f"{get_last_word_part(current_word)}"
+            )
+        except Exception:
+            pass
+        return
+
+    if is_word_used(game, text):
+        try:
+            await message.reply_text(
+                "❌ Từ này đã được sử dụng rồi!"
+            )
+        except Exception:
+            pass
+        return
+
+    add_used_word(game, text)
+
+    game["current_word"] = text
+
+    next_word_turn(game)
+
+    next_user_id = get_current_word_player(game)
+
+    next_name = get_word_player_name(
+        game,
+        next_user_id
+    )
+
+    try:
+        await message.reply_text(
+            "✅ Hợp lệ!\n\n"
+            f"🔤 Từ: {text}\n"
+            f"👉 Lượt tiếp theo: {next_name}"
+        )
+    except Exception:
+        pass
+
+    try:
+        await save_db_async()
+    except Exception:
+        pass
+
 async def word_callback_router(
     update,
     context
@@ -7240,11 +7338,6 @@ async def word_callback_router(
 # PHẦN 20/25
 # GAME NỐI CHỮ — XỬ LÝ LƯỢT + GAMEOFF
 # ============================================================
-
-async def process_word_game(update, context):
-
-    if not is_group(update):
-        return
 
     message = update.effective_message
 
@@ -11659,9 +11752,6 @@ def main():
 
     # ========================================================
     # TIN NHẮN GAME NỐI CHỮ
-    #
-    # Đặt trước handler bảo vệ để xử lý lượt chơi.
-    # Handler bảo vệ vẫn được chạy ở group khác.
     # ========================================================
 
     application.add_handler(
@@ -11675,6 +11765,21 @@ def main():
     # ========================================================
     # TIN NHẮN MEDIA
     # ========================================================
+
+    application.add_handler(
+        MessageHandler(
+            (
+                filters.PHOTO
+                | filters.VIDEO
+                | filters.Document.ALL
+                | filters.AUDIO
+                | filters.VOICE
+                | filters.VIDEO_NOTE
+            ),
+            media_message_handler
+        ),
+        group=1
+    )
 
     application.add_handler(
         MessageHandler(
