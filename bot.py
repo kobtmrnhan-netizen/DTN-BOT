@@ -477,7 +477,7 @@ async def start(update, context):
     await update.message.reply_text(
         "Chào bạn tôi là DTN BOT\n\n"
         "Vui lòng /help để biết thêm về tôi\n\n"
-        f"Owner : {@DTN_207}"
+        "Owner : {@DTN_207}"
     )
 
 
