@@ -299,7 +299,7 @@ def calculate_level(message_count):
 
 
 def get_level_data(chat_id, user_id):
-    conn = get_db()
+    conn = db_connect()
 
     row = conn.execute(
         """
@@ -318,7 +318,7 @@ def get_level_data(chat_id, user_id):
 def add_level_message(chat_id, user_id, username, first_name):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    conn = get_db()
+    conn = db_connect()
 
     row = conn.execute(
         """
@@ -1481,7 +1481,7 @@ async def command_levelbxh(message, args=None):
 
     chat_id = message["chat"]["id"]
 
-    conn = get_db()
+    conn = db_connect()
 
     rows = conn.execute(
         """
