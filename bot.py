@@ -1212,210 +1212,95 @@ def command_args(
 # HELP
 # ============================================================
 
-HELP_TEXT = """
-<b>🤖 NGỌC MỸ — HELP</b>
-
-<b>👤 LỆNH CƠ BẢN</b>
-
-<code>/start</code>
-→ Khởi động bot.
-
-<code>/help</code>
-→ Xem toàn bộ lệnh.
-
-<code>/id</code>
-→ Xem Telegram ID.
-
-<code>/info</code>
-→ Xem thông tin tài khoản.
-
-<code>/ping</code>
-→ Kiểm tra tốc độ phản hồi.
-
-<code>/time</code>
-→ Xem thời gian hiện tại.
-
-<code>/stats</code>
-→ Xem thống kê bot.
-
-<code>/settings</code>
-→ Xem cài đặt bảo vệ nhóm.
-
-
-<b>🛠 TIỆN ÍCH</b>
-
-<code>/echo &lt;nội dung&gt;</code>
-→ Bot lặp lại nội dung.
-
-<code>/calc &lt;phép tính&gt;</code>
-→ Tính toán.
-
-<code>/search &lt;từ khóa&gt;</code>
-→ Tìm kiếm.
-
-<code>/weather &lt;thành phố&gt;</code>
-→ Xem thời tiết.
-
-<code>/short &lt;URL&gt;</code>
-→ Rút gọn liên kết.
-
-
-<b>🛡 QUẢN LÝ NHÓM</b>
-
-<code>/warn [ID/@username]</code>
-→ Cảnh cáo.
-
-<code>/warns [ID/@username]</code>
-→ Xem cảnh cáo.
-
-<code>/mute [ID/@username] [10m/1h/1d]</code>
-→ Mute.
-
-<code>/unmute [ID/@username]</code>
-→ Bỏ mute.
-
-<code>/kick [ID/@username]</code>
-→ Kick.
-
-<code>/ban [ID/@username] [10m/1h/1d]</code>
-→ Ban.
-
-<code>/unban [ID/@username]</code>
-→ Bỏ ban.
-
-<code>/purge &lt;số lượng&gt;</code>
-→ Xóa tin nhắn.
-
-<code>/pin</code>
-→ Ghim tin nhắn reply.
-
-<code>/unpin</code>
-→ Bỏ ghim.
-
-<code>/lock</code>
-→ Khóa nhóm.
-
-<code>/unlock</code>
-→ Mở khóa nhóm.
-
-
-<b>👑 BOT ADMIN</b>
-
-<code>/admins</code>
-→ Xem admin nhóm.
-
-<code>/broadcast &lt;nội dung&gt;</code>
-→ Broadcast.
-
-<code>/users</code>
-→ Xem số người dùng.
-
-<code>/banuser [ID]</code>
-→ Cấm dùng bot.
-
-<code>/unbanuser [ID]</code>
-→ Gỡ cấm bot.
-
-<code>/restart</code>
-→ Khởi động lại bot.
-
-<code>/logs</code>
-→ Xem logs.
-
-
-<b>⚙️ HỆ THỐNG</b>
-
-<code>/database</code>
-→ Kiểm tra database.
-
-<code>/health</code>
-→ Kiểm tra bot.
-
-<code>/version</code>
-→ Xem phiên bản.
-
-
-<b>🛡 BẢO VỆ</b>
-
-<code>/antispam on|off</code>
-→ Chống spam.
-
-<code>/antilink on|off</code>
-→ Chống link.
-
-<code>/antibuff on|off</code>
-→ Phát hiện join bất thường.
-
-<code>/antifake on|off</code>
-→ Phát hiện giả mạo.
-
-
-<b>💤 AFK</b>
-
-<code>/afk [lý do]</code>
-→ Bật AFK.
-
-→ Reply/mention sẽ được thông báo.
-→ Gửi tin mới sẽ tự tắt AFK.
-
-
-<b>🔎 FILTER</b>
-
-<code>/filter &lt;từ khóa&gt; | &lt;nội dung&gt;</code>
-→ Tạo auto-reply.
-
-<code>/filters</code>
-→ Xem filter.
-
-<code>/stopfilter &lt;từ khóa&gt;</code>
-→ Xóa filter.
-
-
-<b>❤️ THƠ</b>
-
-<code>/thodoi</code>
-→ Random thơ đời.
-
-<code>/thotinh</code>
-→ Random thơ tình.
-
-
-<b>🔥 ĐIỂM DANH</b>
-
-<code>/diemdanh</code>
-→ Điểm danh hằng ngày.
-
-→ Có streak liên tiếp.
-→ Lưu database.
-→ Mỗi ngày một lần.
-
-
-<b>📌 QUYỀN</b>
-
-• Quản lý nhóm: Admin.
-• Quản trị bot: Owner.
-• Bảo vệ: Admin.
-• Điểm danh: Thành viên.
-• Tiện ích: Người dùng.
-
-<b>⭐ LEVEL</b>
-• level — Xem hệ thống Level
-• levelyou — Xem Level hiện tại
-• levelbxh — Xếp hạng Level trong nhóm
-• leveldanhsach — Danh sách điều kiện lên Level
-• levelnhiemvu — Xem nhiệm vụ tiếp theo
-
-<b>🎮 TRÒ CHƠI<b/>
-
-• noichu
-→ Khởi động trò chơi Nối Chữ Việt Nam
-→ Người chơi bấm nút THAM GIA để vào game
-→ Game bắt đầu sau 3 phút
-→ Ít nhất 2 người chơi
-
-👑 Owner: @DTN_207
-"""
-
+help_text = (
+    "🤖 NGỌC MỸ — DANH SÁCH LỆNH\n\n"
+
+    "👤 LỆNH CƠ BẢN\n"
+    "/start → Khởi động và xem thông tin bot\n"
+    "/help → Xem toàn bộ hướng dẫn sử dụng\n"
+    "/id → Xem ID Telegram của bạn\n"
+    "/info → Xem thông tin người dùng\n"
+    "/ping → Kiểm tra bot có đang hoạt động\n"
+    "/time → Xem thời gian hiện tại\n"
+    "/stats → Xem thống kê bot\n"
+    "/settings → Xem cài đặt nhóm\n\n"
+
+    "🛠 TIỆN ÍCH\n"
+    "/echo → Bot nhắc lại nội dung bạn nhập\n"
+    "/calc → Tính phép tính nhanh\n"
+    "/search → Tìm kiếm thông tin\n"
+    "/weather → Xem thời tiết\n"
+    "/short → Rút gọn liên kết\n\n"
+
+    "🛡 QUẢN LÝ NHÓM\n"
+    "/warn → Cảnh cáo thành viên\n"
+    "/warns → Xem số lần cảnh cáo\n"
+    "/mute → Khóa chat thành viên\n"
+    "/unmute → Mở khóa chat\n"
+    "/kick → Đá thành viên khỏi nhóm\n"
+    "/ban → Cấm thành viên\n"
+    "/unban → Gỡ cấm thành viên\n"
+    "/purge → Xóa nhiều tin nhắn\n"
+    "/pin → Ghim tin nhắn\n"
+    "/unpin → Bỏ ghim tin nhắn\n"
+    "/lock → Khóa chat\n"
+    "/unlock → Mở khóa chat\n\n"
+
+    "👑 QUẢN TRỊ BOT\n"
+    "/admins → Xem quản trị viên\n"
+    "/broadcast → Gửi thông báo đến người dùng\n"
+    "/users → Xem danh sách người dùng bot\n"
+    "/banuser → Cấm người dùng sử dụng bot\n"
+    "/unbanuser → Gỡ cấm người dùng bot\n"
+    "/restart → Khởi động lại bot\n"
+    "/logs → Xem log hoạt động\n\n"
+
+    "⚙️ HỆ THỐNG\n"
+    "/database → Kiểm tra database\n"
+    "/health → Kiểm tra tình trạng bot\n"
+    "/version → Xem phiên bản bot\n\n"
+
+    "🛡 BẢO VỆ\n"
+    "/antispam on|off → Bật/tắt chống spam\n"
+    "/antilink on|off → Bật/tắt chống link\n"
+    "/antibuff on|off → Bật/tắt chống buff thành viên\n"
+    "/antifake on|off → Bật/tắt chống giả mạo\n\n"
+
+    "💤 AFK\n"
+    "/afk [lý do] → Bật trạng thái AFK\n"
+    "→ Bot thông báo khi có người nhắc đến bạn\n\n"
+
+    "🔎 FILTER\n"
+    "/filter → Tạo từ khóa tự động trả lời\n"
+    "/filters → Xem danh sách filter\n"
+    "/stopfilter → Xóa filter\n\n"
+
+    "❤️ THƠ\n"
+    "/thodoi → Random một bài thơ đời\n"
+    "/thotinh → Random một bài thơ tình\n\n"
+
+    "🔥 ĐIỂM DANH\n"
+    "/diemdanh → Mở bảng điểm danh hằng ngày\n"
+    "→ Tích điểm và duy trì chuỗi điểm danh\n\n"
+
+    "⭐ LEVEL\n"
+    "/level → Xem hệ thống level\n"
+    "/levelyou → Xem level hiện tại của bạn\n"
+    "/levelbxh → Xem bảng xếp hạng level trong nhóm\n"
+    "/leveldanhsach → Xem điều kiện lên từng level\n"
+    "/levelnhiemvu → Xem nhiệm vụ tiếp theo\n\n"
+
+    "🎮 TRÒ CHƠI — NỐI CHỮ VIỆT NAM\n"
+    "/noichu → Mở game Nối Chữ Việt Nam\n"
+    "→ Bấm nút THAM GIA để vào game\n"
+    "→ Cần ít nhất 2 người chơi\n"
+    "→ Game bắt đầu sau 3 phút\n"
+    "→ Người chơi phải nối từ đúng lượt\n"
+    "→ Nối sai sẽ bị loại\n"
+    "→ Người cuối cùng còn lại là người chiến thắng\n\n"
+
+    "👑 Owner: @DTN_207"
+)
 
 # ============================================================
 # BASIC COMMANDS
@@ -2470,6 +2355,97 @@ async def command_start(
             f"để xem toàn bộ lệnh."
         )
     )
+
+    message
+
+    message
+
+HELP_TEXT = (
+    "🤖 NGỌC MỸ — DANH SÁCH LỆNH\n\n"
+
+    "👤 LỆNH CƠ BẢN\n"
+    "/start → Khởi động bot\n"
+    "/help → Xem hướng dẫn sử dụng\n"
+    "/id → Xem ID Telegram\n"
+    "/info → Xem thông tin tài khoản\n"
+    "/ping → Kiểm tra bot\n"
+    "/time → Xem thời gian\n"
+    "/stats → Xem thống kê bot\n"
+    "/settings → Xem cài đặt nhóm\n\n"
+
+    "🛠 TIỆN ÍCH\n"
+    "/echo → Bot lặp lại nội dung\n"
+    "/calc → Tính phép tính\n"
+    "/search → Tìm kiếm thông tin\n"
+    "/weather → Xem thời tiết\n"
+    "/short → Rút gọn liên kết\n\n"
+
+    "🛡 QUẢN LÝ NHÓM\n"
+    "/warn → Cảnh cáo thành viên\n"
+    "/warns → Xem cảnh cáo\n"
+    "/mute → Khóa chat thành viên\n"
+    "/unmute → Mở khóa chat\n"
+    "/kick → Đá thành viên\n"
+    "/ban → Cấm thành viên\n"
+    "/unban → Gỡ cấm thành viên\n"
+    "/purge → Xóa nhiều tin nhắn\n"
+    "/pin → Ghim tin nhắn\n"
+    "/unpin → Bỏ ghim\n"
+    "/lock → Khóa chat\n"
+    "/unlock → Mở khóa chat\n\n"
+
+    "👑 QUẢN TRỊ BOT\n"
+    "/admins → Xem quản trị viên\n"
+    "/broadcast → Gửi thông báo\n"
+    "/users → Xem người dùng\n"
+    "/banuser → Cấm người dùng bot\n"
+    "/unbanuser → Gỡ cấm người dùng bot\n"
+    "/restart → Khởi động lại bot\n"
+    "/logs → Xem log\n\n"
+
+    "⚙️ HỆ THỐNG\n"
+    "/database → Kiểm tra database\n"
+    "/health → Kiểm tra tình trạng bot\n"
+    "/version → Xem phiên bản\n\n"
+
+    "🛡 BẢO VỆ\n"
+    "/antispam on|off → Chống spam\n"
+    "/antilink on|off → Chống link\n"
+    "/antibuff on|off → Chống buff\n"
+    "/antifake on|off → Chống giả mạo\n\n"
+
+    "💤 AFK\n"
+    "/afk [lý do] → Bật trạng thái AFK\n\n"
+
+    "🔎 FILTER\n"
+    "/filter → Tạo filter tự động trả lời\n"
+    "/filters → Xem các filter\n"
+    "/stopfilter → Xóa filter\n\n"
+
+    "❤️ THƠ\n"
+    "/thodoi → Random thơ đời\n"
+    "/thotinh → Random thơ tình\n\n"
+
+    "🔥 ĐIỂM DANH\n"
+    "/diemdanh → Điểm danh hằng ngày\n\n"
+
+    "⭐ LEVEL\n"
+    "/level → Hệ thống level\n"
+    "/levelyou → Xem level hiện tại\n"
+    "/levelbxh → Xem bảng xếp hạng level\n"
+    "/leveldanhsach → Xem điều kiện lên level\n"
+    "/levelnhiemvu → Xem nhiệm vụ tiếp theo\n\n"
+
+    "🎮 TRÒ CHƠI — NỐI CHỮ VIỆT NAM\n"
+    "/noichu → Mở trò chơi Nối Chữ\n"
+    "→ Bấm THAM GIA để vào game\n"
+    "→ Cần ít nhất 2 người chơi\n"
+    "→ Game bắt đầu sau 3 phút\n"
+    "→ Nối sai sẽ bị loại\n"
+    "→ Người cuối cùng còn lại thắng\n\n"
+
+    "👑 Owner: @DTN_207"
+)
 
 async def command_help(
     message
