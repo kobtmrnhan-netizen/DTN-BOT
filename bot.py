@@ -462,7 +462,6 @@ async def api(
     data=None,
     timeout=30
 ):
-
     return await asyncio.to_thread(
         telegram_request,
         method,
@@ -1399,12 +1398,20 @@ HELP_TEXT = """
 • Điểm danh: Thành viên.
 • Tiện ích: Người dùng.
 
-⭐ LEVEL
-/level — Xem hệ thống Level
-/levelyou — Xem Level hiện tại
-/levelbxh — Xếp hạng Level trong nhóm
-/leveldanhsach — Danh sách điều kiện lên Level
-/levelnhiemvu — Xem nhiệm vụ tiếp theo
+<b>⭐ LEVEL</b>
+• level — Xem hệ thống Level
+• levelyou — Xem Level hiện tại
+• levelbxh — Xếp hạng Level trong nhóm
+• leveldanhsach — Danh sách điều kiện lên Level
+• levelnhiemvu — Xem nhiệm vụ tiếp theo
+
+<b>🎮 TRÒ CHƠI<b/>
+
+• noichu
+→ Khởi động trò chơi Nối Chữ Việt Nam
+→ Người chơi bấm nút THAM GIA để vào game
+→ Game bắt đầu sau 3 phút
+→ Ít nhất 2 người chơi
 
 👑 Owner: @DTN_207
 """
