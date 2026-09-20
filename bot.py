@@ -185,6 +185,17 @@ def init_db():
 
         conn.executescript(
             """
+            CREATE TABLE IF NOT EXISTS levels (
+                chat_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                username TEXT,
+                first_name TEXT,
+                message_count INTEGER NOT NULL DEFAULT 0,
+                level INTEGER NOT NULL DEFAULT 1,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY(chat_id, user_id)
+            );
+
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 username TEXT,
@@ -260,6 +271,110 @@ def init_db():
     finally:
 
         conn.close()
+
+# ==================== LEVEL SYSTEM ====================
+
+LEVEL_REQUIREMENTS = {
+    1: 0,
+    2: 100,
+    3: 300,
+    4: 500,
+    5: 700,
+    6: 900,
+    7: 1100,
+    8: 1300,
+    9: 1500,
+    10: 2000,
+}
+
+
+def calculate_level(message_count):
+    current_level = 1
+
+    for level, required in LEVEL_REQUIREMENTS.items():
+        if message_count >= required:
+            current_level = level
+
+    return current_level
+
+
+def get_level_data(chat_id, user_id):
+    conn = get_db()
+
+    row = conn.execute(
+        """
+        SELECT chat_id, user_id, username, first_name,
+               message_count, level, updated_at
+        FROM levels
+        WHERE chat_id = ? AND user_id = ?
+        """,
+        (chat_id, user_id)
+    ).fetchone()
+
+    conn.close()
+    return row
+
+
+def add_level_message(chat_id, user_id, username, first_name):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = get_db()
+
+    row = conn.execute(
+        """
+        SELECT message_count, level
+        FROM levels
+        WHERE chat_id = ? AND user_id = ?
+        """,
+        (chat_id, user_id)
+    ).fetchone()
+
+    if row:
+        message_count = row[0] + 1
+        old_level = row[1]
+    else:
+        message_count = 1
+        old_level = 1
+
+    new_level = calculate_level(message_count)
+
+    conn.execute(
+        """
+        INSERT INTO levels
+        (
+            chat_id,
+            user_id,
+            username,
+            first_name,
+            message_count,
+            level,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+
+        ON CONFLICT(chat_id, user_id)
+        DO UPDATE SET
+            username = excluded.username,
+            first_name = excluded.first_name,
+            message_count = excluded.message_count,
+            level = excluded.level,
+            updated_at = excluded.updated_at
+        """,
+        (
+            chat_id,
+            user_id,
+            username,
+            first_name,
+            message_count,
+            new_level,
+            now
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return message_count, old_level, new_level
 
     logger.info(
         "Database initialized."
@@ -995,7 +1110,7 @@ async def startup():
     )
 
     logger.info(
-        "THEONE BOT v%s",
+        "Ngọc Mỹ v%s",
         VERSION
     )
 
@@ -1026,7 +1141,7 @@ async def startup():
 # ============================================================
 
 # ============================================================
-# THEONE BOT - PURE PYTHON VERSION
+# NGỌC MỸ - PURE PYTHON VERSION
 # PHẦN 2/10
 # UPDATE POLLING + COMMAND ROUTER + BASIC COMMANDS
 # ============================================================
@@ -1099,7 +1214,7 @@ def command_args(
 # ============================================================
 
 HELP_TEXT = """
-<b>🤖 THEONE BOT — HELP</b>
+<b>🤖 NGỌC MỸ — HELP</b>
 
 <b>👤 LỆNH CƠ BẢN</b>
 
@@ -1284,6 +1399,12 @@ HELP_TEXT = """
 • Điểm danh: Thành viên.
 • Tiện ích: Người dùng.
 
+⭐ LEVEL
+/level — Xem hệ thống Level
+/levelyou — Xem Level hiện tại
+/levelbxh — Xếp hạng Level trong nhóm
+/leveldanhsach — Danh sách điều kiện lên Level
+/levelnhiemvu — Xem nhiệm vụ tiếp theo
 
 👑 Owner: @DTN_207
 """
@@ -1292,6 +1413,1025 @@ HELP_TEXT = """
 # ============================================================
 # BASIC COMMANDS
 # ============================================================
+
+# ==================== LEVEL COMMANDS ====================
+
+async def command_level(message, args=None):
+    if not is_group(message):
+        await send_message(
+            message["chat"]["id"],
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    chat_id = message["chat"]["id"]
+    user = message["from"]
+
+    username = user.get("username")
+    first_name = user.get("first_name", "Người dùng")
+
+    count, old_level, new_level = add_level_message(
+        chat_id,
+        user["id"],
+        username,
+        first_name
+    )
+
+    if new_level > old_level:
+        mention = (
+            f"@{username}"
+            if username
+            else f'<a href="tg://user?id={user["id"]}">{html.escape(first_name)}</a>'
+        )
+
+        if new_level < 10:
+            await send_message(
+                chat_id,
+                f"🎉 Chúc Mừng {mention} đã lên level {new_level} "
+                f"để lên level tiếp theo vui lòng rõ lệnh /levelnhiemvu",
+                parse_mode="HTML"
+            )
+        else:
+            await send_message(
+                chat_id,
+                f"🏆 Chúc Mừng {mention} đã đạt LEVEL 10!\n"
+                f"🔥 Bạn đã đạt cấp độ tối đa của hệ thống Level.",
+                parse_mode="HTML"
+            )
+    else:
+        await send_message(
+            chat_id,
+            f"📊 Bạn hiện đang ở level {new_level} với {count} tin nhắn."
+        )
+
+
+async def command_levelyou(message, args=None):
+    if not is_group(message):
+        await send_message(
+            message["chat"]["id"],
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    chat_id = message["chat"]["id"]
+    user = message["from"]
+
+    row = get_level_data(chat_id, user["id"])
+
+    if not row:
+        count = 0
+        level = 1
+    else:
+        count = row["message_count"]
+        level = row["level"]
+
+    username = user.get("username")
+
+    if username:
+        name = f"@{username}"
+    else:
+        name = user.get("first_name", "Bạn")
+
+    await send_message(
+        chat_id,
+        f"👤 {name}\n"
+        f"⭐ Level hiện của bạn là level {level}\n"
+        f"💬 Số tin nhắn: {count}"
+    )
+
+
+async def command_leveldanhsach(message, args=None):
+    if not is_group(message):
+        await send_message(
+            message["chat"]["id"],
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    text = (
+        "📋 <b>ĐÂY LÀ DANH SÁCH ĐIỀU KIỆN LÊN LEVEL</b>\n\n"
+        "⭐ Level 1 → 0 tin nhắn\n"
+        "⭐ Level 2 → 100 tin nhắn\n"
+        "⭐ Level 3 → 300 tin nhắn\n"
+        "⭐ Level 4 → 500 tin nhắn\n"
+        "⭐ Level 5 → 700 tin nhắn\n"
+        "⭐ Level 6 → 900 tin nhắn\n"
+        "⭐ Level 7 → 1100 tin nhắn\n"
+        "⭐ Level 8 → 1300 tin nhắn\n"
+        "⭐ Level 9 → 1500 tin nhắn\n"
+        "🏆 Level 10 → 2000 tin nhắn\n\n"
+        "💡 Tin nhắn được cộng dồn liên tục."
+    )
+
+    await send_message(
+        message["chat"]["id"],
+        text,
+        parse_mode="HTML"
+    )
+
+
+async def command_levelnhiemvu(message, args=None):
+    if not is_group(message):
+        await send_message(
+            message["chat"]["id"],
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    chat_id = message["chat"]["id"]
+    user = message["from"]
+
+    row = get_level_data(chat_id, user["id"])
+
+    if not row:
+        count = 0
+        level = 1
+    else:
+        count = row["message_count"]
+        level = row["level"]
+
+    username = user.get("username")
+
+    if username:
+        name = f"@{username}"
+    else:
+        name = user.get("first_name", "Bạn")
+
+    if level >= 10:
+        await send_message(
+            chat_id,
+            f"🏆 Nhiệm vụ tiếp theo của {name}:\n"
+            f"Bạn đã đạt LEVEL 10 — cấp độ tối đa."
+        )
+        return
+
+    next_level = level + 1
+    required = LEVEL_REQUIREMENTS[next_level]
+    remaining = max(0, required - count)
+
+    await send_message(
+        chat_id,
+        f"🎯 Nhiệm vụ tiếp theo để lên level của bạn {name} là:\n\n"
+        f"⭐ Level hiện tại: {level}\n"
+        f"💬 Đã có: {count} tin nhắn\n"
+        f"🎯 Cần: {required} tin nhắn\n"
+        f"🔥 Còn thiếu: {remaining} tin nhắn"
+    )
+
+
+async def command_levelbxh(message, args=None):
+    if not is_group(message):
+        await send_message(
+            message["chat"]["id"],
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    chat_id = message["chat"]["id"]
+
+    conn = get_db()
+
+    rows = conn.execute(
+        """
+        SELECT user_id, username, first_name, message_count, level
+        FROM levels
+        WHERE chat_id = ? AND level >= 2
+        ORDER BY level DESC, message_count DESC
+        """,
+        (chat_id,)
+    ).fetchall()
+
+    conn.close()
+
+    if not rows:
+        await send_message(
+            chat_id,
+            "📊 Đây là bản xếp hạng level trong nhóm.\n\n"
+            "Hiện chưa có thành viên nào đạt Level 2+."
+        )
+        return
+
+    lines = [
+        "🏆 <b>ĐÂY LÀ BẢN XẾP HẠNG LEVEL TRONG NHÓM</b>",
+        ""
+    ]
+
+    for index, row in enumerate(rows, 1):
+        username = row["username"]
+
+        if username:
+            name = f"@{username}"
+        else:
+            name = row["first_name"] or "Người dùng"
+
+        lines.append(
+            f"{index}. {name} — ⭐ Level {row['level']} "
+            f"💬 {row['message_count']} tin"
+        )
+
+    await send_message(
+        chat_id,
+        "\n".join(lines),
+        parse_mode="HTML"
+    )
+
+# ============================================================
+# 🎮 NỐI CHỮ VIỆT NAM - GAME STATE
+# ============================================================
+
+NOICHU_GAMES = {}
+NOICHU_TASKS = {}
+
+
+def noichu_normalize(text):
+    if not text:
+        return ""
+
+    return " ".join(
+        text.strip().lower().split()
+    )
+
+
+def noichu_first_word(text):
+    text = noichu_normalize(text)
+
+    if not text:
+        return ""
+
+    return text.split()[0]
+
+
+def noichu_last_word(text):
+    text = noichu_normalize(text)
+
+    if not text:
+        return ""
+
+    return text.split()[-1]
+
+
+def noichu_display_name(user):
+    username = user.get("username")
+
+    if username:
+        return f"@{username}"
+
+    return user.get(
+        "first_name",
+        "Người chơi"
+    )
+
+
+def noichu_create_game(chat_id):
+    game = {
+        "chat_id": chat_id,
+        "players": [],
+        "active_players": [],
+        "turn_order": [],
+        "current_player": None,
+        "last_phrase": None,
+        "last_word": None,
+        "started": False,
+        "started_at": None,
+        "turn_started_at": None,
+        "valid_answers": {},
+        "invalid_answers": {},
+        "response_times": {},
+        "total_words": {},
+        "rounds": 0,
+        "lobby_message_id": None,
+    }
+
+    NOICHU_GAMES[chat_id] = game
+
+    return game
+
+
+def noichu_get_game(chat_id):
+    return NOICHU_GAMES.get(chat_id)
+
+
+def noichu_add_player(game, user):
+    user_id = user.get("id")
+
+    if not user_id:
+        return False
+
+    for player in game["players"]:
+        if player["id"] == user_id:
+            return False
+
+    game["players"].append({
+        "id": user_id,
+        "username": user.get("username"),
+        "first_name": user.get(
+            "first_name",
+            "Người chơi"
+        ),
+    })
+
+    game["valid_answers"][user_id] = 0
+    game["invalid_answers"][user_id] = 0
+    game["response_times"][user_id] = []
+    game["total_words"][user_id] = 0
+
+    return True
+
+
+def noichu_remove_player(game, user_id):
+    game["active_players"] = [
+        player
+        for player in game["active_players"]
+        if player["id"] != user_id
+    ]
+
+
+def noichu_player_exists(game, user_id):
+    return any(
+        player["id"] == user_id
+        for player in game["players"]
+    )
+
+
+def noichu_get_player(game, user_id):
+    for player in game["players"]:
+        if player["id"] == user_id:
+            return player
+
+    return None
+
+
+def noichu_player_text(player, number):
+    name = noichu_display_name(player)
+
+    return f"{number}. {name}"
+
+
+def noichu_cancel_task(chat_id):
+    task = NOICHU_TASKS.pop(
+        chat_id,
+        None
+    )
+
+    if task:
+
+        try:
+            task.cancel()
+        except Exception:
+            pass
+
+# ============================================================
+# 🎮 NỐI CHỮ VIỆT NAM - LOBBY + NÚT THAM GIA
+# ============================================================
+
+async def command_noichu(message, args=None):
+    if not is_group(message):
+        await send_message(
+            message["chat"]["id"],
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    chat_id = message["chat"]["id"]
+
+    # Nếu nhóm đang có game
+    if chat_id in NOICHU_GAMES:
+        old_game = NOICHU_GAMES[chat_id]
+
+        if old_game.get("started"):
+            await send_message(
+                chat_id,
+                "🎮 Nhóm đang có một ván Nối Chữ đang diễn ra."
+            )
+            return
+
+        if old_game.get("players"):
+            await send_message(
+                chat_id,
+                "🎮 Nhóm đã có phòng Nối Chữ đang chờ người chơi."
+            )
+            return
+
+        noichu_cancel_task(chat_id)
+
+    game = noichu_create_game(chat_id)
+
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "🎮 THAM GIA",
+                    "callback_data": f"noichu_join:{chat_id}"
+                }
+            ]
+        ]
+    }
+
+    text = (
+        "🎮 <b>WELCOME ĐẾN VỚI NỐI CHỮ VIỆT NAM</b>\n\n"
+        "Vui lòng bấm vào nút <b>THAM GIA</b> để vào trò chơi.\n\n"
+        "👥 Tối thiểu: 2 người chơi\n"
+        "⏱ Thời gian đăng ký: 3 phút\n"
+        "🔀 Thứ tự lượt chơi sẽ được xáo ngẫu nhiên.\n\n"
+        "⚠️ Khi game bắt đầu, chỉ người đúng lượt mới được trả lời."
+    )
+
+    result = await send_message(
+        chat_id,
+        text,
+        parse_mode="HTML",
+        reply_markup=keyboard
+    )
+
+    if isinstance(result, dict):
+        sent_message = result.get("result")
+
+        if isinstance(sent_message, dict):
+            game["lobby_message_id"] = sent_message.get("message_id")
+
+    # Chờ 3 phút rồi bắt đầu game
+    task = asyncio.create_task(
+        noichu_start_after_delay(chat_id)
+    )
+
+    NOICHU_TASKS[chat_id] = task
+
+
+async def noichu_start_after_delay(chat_id):
+    try:
+        await asyncio.sleep(180)
+
+        game = noichu_get_game(chat_id)
+
+        if not game:
+            return
+
+        if game.get("started"):
+            return
+
+        if len(game.get("players", [])) < 2:
+            await send_message(
+                chat_id,
+                "❌ Nối Chữ đã hết thời gian đăng ký nhưng chưa đủ 2 người chơi.\n"
+                "Ván chơi đã bị hủy."
+            )
+
+            NOICHU_GAMES.pop(
+                chat_id,
+                None
+            )
+
+            return
+
+        await noichu_start_game(chat_id)
+
+    except asyncio.CancelledError:
+        return
+
+    except Exception as e:
+        logger.exception(
+            "NOICHU START ERROR: %s",
+            e
+        )
+
+    finally:
+        NOICHU_TASKS.pop(
+            chat_id,
+            None
+        )
+
+
+async def handle_noichu_callback(callback_query):
+    data = callback_query.get(
+        "data",
+        ""
+    )
+
+    if not data.startswith("noichu_join:"):
+        return False
+
+    try:
+        chat_id = int(
+            data.split(
+                ":",
+                1
+            )[1]
+        )
+    except Exception:
+        return True
+
+    user = callback_query.get("from")
+
+    if not user:
+        return True
+
+    game = noichu_get_game(chat_id)
+
+    if not game:
+        await api(
+            "answerCallbackQuery",
+            {
+                "callback_query_id": callback_query["id"],
+                "text": "Phòng chơi không còn tồn tại.",
+                "show_alert": True
+            }
+        )
+
+        return True
+
+    if game.get("started"):
+        await api(
+            "answerCallbackQuery",
+            {
+                "callback_query_id": callback_query["id"],
+                "text": "Ván chơi đã bắt đầu.",
+                "show_alert": True
+            }
+        )
+
+        return True
+
+    added = noichu_add_player(
+        game,
+        user
+    )
+
+    if not added:
+        await api(
+            "answerCallbackQuery",
+            {
+                "callback_query_id": callback_query["id"],
+                "text": "Bạn đã tham gia rồi.",
+                "show_alert": True
+            }
+        )
+
+        return True
+
+    await api(
+        "answerCallbackQuery",
+        {
+            "callback_query_id": callback_query["id"],
+            "text": "🎮 Tham gia thành công!"
+        }
+    )
+
+    lines = [
+        "🎮 <b>NỐI CHỮ VIỆT NAM</b>",
+        "",
+        "👥 <b>Danh sách người chơi:</b>"
+    ]
+
+    for index, player in enumerate(
+        game["players"],
+        1
+    ):
+        lines.append(
+            noichu_player_text(
+                player,
+                index
+            )
+        )
+
+    lines.extend([
+        "",
+        f"👤 Tổng người chơi: <b>{len(game['players'])}</b>",
+        "⏱ Game sẽ bắt đầu sau 3 phút kể từ khi tạo phòng.",
+        "",
+        "Bấm <b>THAM GIA</b> để vào danh sách."
+    ])
+
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "🎮 THAM GIA",
+                    "callback_data": f"noichu_join:{chat_id}"
+                }
+            ]
+        ]
+    }
+
+    message_id = game.get(
+        "lobby_message_id"
+    )
+
+    if message_id:
+
+        try:
+            await api(
+                "editMessageText",
+                {
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": "\n".join(lines),
+                    "parse_mode": "HTML",
+                    "reply_markup": keyboard
+                }
+            )
+        except Exception:
+            pass
+
+    return True
+
+# ============================================================
+# 🎮 NỐI CHỮ VIỆT NAM - BẮT ĐẦU GAME + CHIA LƯỢT
+# ============================================================
+
+async def noichu_start_game(chat_id):
+    game = noichu_get_game(chat_id)
+
+    if not game:
+        return
+
+    players = list(game.get("players", []))
+
+    if len(players) < 2:
+        await send_message(
+            chat_id,
+            "❌ Không đủ 2 người chơi để bắt đầu Nối Chữ."
+        )
+
+        NOICHU_GAMES.pop(
+            chat_id,
+            None
+        )
+
+        return
+
+    # Xáo ngẫu nhiên thứ tự ban đầu
+    random.shuffle(players)
+
+    game["active_players"] = players.copy()
+    game["turn_order"] = players.copy()
+    game["started"] = True
+    game["started_at"] = time.time()
+    game["last_phrase"] = None
+    game["last_word"] = None
+    game["rounds"] = 0
+
+    # Reset dữ liệu thống kê
+    for player in players:
+        user_id = player["id"]
+
+        game["valid_answers"][user_id] = 0
+        game["invalid_answers"][user_id] = 0
+        game["response_times"][user_id] = []
+        game["total_words"][user_id] = 0
+
+    names = []
+
+    for index, player in enumerate(players, 1):
+        names.append(
+            f"{index}. {noichu_display_name(player)}"
+        )
+
+    await send_message(
+        chat_id,
+        "🔥 <b>NỐI CHỮ VIỆT NAM CHÍNH THỨC BẮT ĐẦU!</b>\n\n"
+        "👥 Người chơi:\n"
+        + "\n".join(names)
+        + "\n\n"
+        "🔀 Thứ tự đã được xáo ngẫu nhiên.\n"
+        "⚠️ Chỉ người đúng lượt mới được trả lời.\n"
+        "💀 Nối sai sẽ bị loại.\n\n"
+        "🎯 Người cuối cùng còn lại sẽ chiến thắng!",
+        parse_mode="HTML"
+    )
+
+    await noichu_next_turn(
+        chat_id
+    )
+
+
+async def noichu_next_turn(chat_id):
+    game = noichu_get_game(chat_id)
+
+    if not game or not game.get("started"):
+        return
+
+    active_players = game.get(
+        "active_players",
+        []
+    )
+
+    # Chỉ còn 1 người → chiến thắng
+    if len(active_players) <= 1:
+
+        if len(active_players) == 1:
+            await noichu_finish(
+                chat_id,
+                active_players[0]["id"]
+            )
+
+        else:
+            await send_message(
+                chat_id,
+                "❌ Không còn người chơi. Ván Nối Chữ kết thúc."
+            )
+
+            NOICHU_GAMES.pop(
+                chat_id,
+                None
+            )
+
+        return
+
+    previous_player = game.get(
+        "current_player"
+    )
+
+    # Không chọn lại ngay người vừa chơi nếu còn người khác
+    candidates = [
+        player
+        for player in active_players
+        if player["id"] != previous_player
+    ]
+
+    if not candidates:
+        candidates = active_players
+
+    next_player = random.choice(
+        candidates
+    )
+
+    game["current_player"] = next_player["id"]
+    game["turn_started_at"] = time.time()
+
+    if game.get("last_word"):
+
+        await send_message(
+            chat_id,
+            f"🎯 Đến lượt "
+            f"<a href=\"tg://user?id={next_player['id']}\">"
+            f"{html.escape(noichu_display_name(next_player))}"
+            f"</a>\n\n"
+            f"🔗 Từ trước: <b>{html.escape(game['last_word'])}</b>\n"
+            f"👉 Câu của bạn phải bắt đầu bằng từ "
+            f"<b>{html.escape(game['last_word'])}</b>.",
+            parse_mode="HTML"
+        )
+
+    else:
+
+        await send_message(
+            chat_id,
+            f"🎯 Lượt đầu tiên thuộc về "
+            f"<a href=\"tg://user?id={next_player['id']}\">"
+            f"{html.escape(noichu_display_name(next_player))}"
+            f"</a>!\n\n"
+            f"💬 Hãy nói một cụm từ bất kỳ để bắt đầu trò chơi.",
+            parse_mode="HTML"
+        )
+
+# ============================================================
+# 🎮 NỐI CHỮ VIỆT NAM - XỬ LÝ CÂU TRẢ LỜI
+# ============================================================
+
+async def noichu_handle_text(message):
+    chat = message.get("chat", {})
+    user = message.get("from", {})
+    text = message.get("text", "")
+
+    if chat.get("type") not in ("group", "supergroup"):
+        return False
+
+    if not text or text.startswith("/"):
+        return False
+
+    chat_id = chat.get("id")
+    user_id = user.get("id")
+
+    game = noichu_get_game(chat_id)
+
+    if not game or not game.get("started"):
+        return False
+
+    active_players = game.get("active_players", [])
+
+    # Người không tham gia game nói chuyện
+    if not any(p["id"] == user_id for p in active_players):
+        return False
+
+    # Chưa đến lượt
+    if game.get("current_player") != user_id:
+        await send_message(
+            chat_id,
+            "mày chưa đến lượt bớt tài lanh đi"
+        )
+        return True
+
+    phrase = noichu_normalize(text)
+
+    if not phrase:
+        return True
+
+    first_word = noichu_first_word(phrase)
+    last_word = noichu_last_word(phrase)
+
+    # Kiểm tra nối chữ
+    if game.get("last_word"):
+        required_word = noichu_normalize(
+            game["last_word"]
+        )
+
+        if first_word != required_word:
+            game["invalid_answers"][user_id] = (
+                game["invalid_answers"].get(user_id, 0) + 1
+            )
+
+            player = noichu_get_player(
+                game,
+                user_id
+            )
+
+            name = (
+                noichu_display_name(player)
+                if player
+                else "Người chơi"
+            )
+
+            await send_message(
+                chat_id,
+                f"❌ {name} đã nối sai!\n"
+                f"🔗 Phải bắt đầu bằng: "
+                f"<b>{html.escape(required_word)}</b>\n"
+                f"💀 {name} đã bị loại khỏi trò chơi.",
+                parse_mode="HTML"
+            )
+
+            noichu_remove_player(
+                game,
+                user_id
+            )
+
+            game["current_player"] = None
+
+            await noichu_next_turn(
+                chat_id
+            )
+
+            return True
+
+    # Câu hợp lệ
+    started = game.get(
+        "turn_started_at"
+    ) or time.time()
+
+    response_time = max(
+        0.1,
+        time.time() - started
+    )
+
+    game["valid_answers"][user_id] = (
+        game["valid_answers"].get(user_id, 0) + 1
+    )
+
+    game["response_times"].setdefault(
+        user_id,
+        []
+    ).append(
+        response_time
+    )
+
+    game["total_words"][user_id] = (
+        game["total_words"].get(user_id, 0)
+        + len(phrase.split())
+    )
+
+    game["rounds"] = (
+        game.get("rounds", 0) + 1
+    )
+
+    game["last_phrase"] = phrase
+    game["last_word"] = last_word
+    game["current_player"] = None
+
+    await send_message(
+        chat_id,
+        f"✅ <b>Nối đúng!</b>\n"
+        f"💬 {html.escape(phrase)}\n"
+        f"🔗 Từ tiếp theo phải bắt đầu bằng: "
+        f"<b>{html.escape(last_word)}</b>",
+        parse_mode="HTML"
+    )
+
+    await noichu_next_turn(
+        chat_id
+    )
+
+    return True
+
+# ============================================================
+# 🎮 NỐI CHỮ VIỆT NAM - KẾT THÚC GAME + TÍNH HIỆU SUẤT
+# ============================================================
+
+async def noichu_finish(chat_id, winner_id):
+    game = noichu_get_game(chat_id)
+
+    if not game:
+        return
+
+    winner = noichu_get_player(
+        game,
+        winner_id
+    )
+
+    if not winner:
+        NOICHU_GAMES.pop(
+            chat_id,
+            None
+        )
+        return
+
+    valid = game["valid_answers"].get(
+        winner_id,
+        0
+    )
+
+    times = game["response_times"].get(
+        winner_id,
+        []
+    )
+
+    total_words = game["total_words"].get(
+        winner_id,
+        0
+    )
+
+    # Điểm tốc độ
+    if times:
+        average_time = sum(times) / len(times)
+
+        speed_score = max(
+            0,
+            min(
+                1,
+                (8 - average_time) / 8
+            )
+        )
+    else:
+        average_time = 8
+        speed_score = 0
+
+    # Điểm chất lượng câu
+    if valid > 0:
+        average_words = total_words / valid
+
+        quality_score = max(
+            0,
+            min(
+                1,
+                (average_words - 1) / 4
+            )
+        )
+    else:
+        quality_score = 0
+
+    # Hiệu suất:
+    # 50 điểm nền
+    # 30 điểm tốc độ
+    # 20 điểm chất lượng câu
+    performance = round(
+        50
+        + speed_score * 30
+        + quality_score * 20
+    )
+
+    performance = max(
+        50,
+        min(
+            100,
+            performance
+        )
+    )
+
+    name = noichu_display_name(
+        winner
+    )
+
+    await send_message(
+        chat_id,
+        (
+            "🏆 <b>GAME NỐI CHỮ ĐÃ KẾT THÚC!</b>\n\n"
+            f"👑 Người chiến thắng: <b>{html.escape(name)}</b>\n"
+            f"🔥 Hiệu suất: <b>{performance}%</b>\n"
+            f"✅ Số câu nối đúng: <b>{valid}</b>\n"
+            f"⚡ Thời gian trung bình: <b>{average_time:.2f}s</b>\n\n"
+            "🎉 Chúc mừng nhà vô địch!"
+        ),
+        parse_mode="HTML"
+    )
+
+    # Xóa game sau khi kết thúc
+    NOICHU_GAMES.pop(
+        chat_id,
+        None
+    )
+
+    noichu_cancel_task(
+        chat_id
+    )
 
 async def command_start(
     message
@@ -1314,7 +2454,7 @@ async def command_start(
         (
             f"👋 <b>Xin chào {name}!</b>\n\n"
             f"🤖 Chào mừng đến với "
-            f"<b>THEONE BOT</b>.\n\n"
+            f"<b>NGỌC MỸ</b>.\n\n"
             f"🛡 Quản lý nhóm\n"
             f"⚙️ Tiện ích\n"
             f"🔐 Bảo vệ nhóm\n"
@@ -1323,7 +2463,6 @@ async def command_start(
             f"để xem toàn bộ lệnh."
         )
     )
-
 
 async def command_help(
     message
@@ -1638,6 +2777,13 @@ COMMAND_HANDLERS = {
 
     "settings":
         command_settings,
+
+    "level": command_level,
+    "levelyou": command_levelyou,
+    "levelbxh": command_levelbxh,
+    "leveldanhsach": command_leveldanhsach,
+    "levelnhiemvu": command_levelnhiemvu,
+    "noichu": command_noichu,
 }
 
 
@@ -1675,6 +2821,142 @@ async def dispatch_command(
 # ============================================================
 # UPDATE PROCESSING
 # ============================================================
+
+async def noichu_handle_text(message):
+    """
+    Xử lý tin nhắn trong game Nối Chữ.
+    Trả về True nếu tin nhắn thuộc game, False nếu không.
+    """
+    chat = message.get("chat", {})
+    if chat.get("type") not in ("group", "supergroup"):
+        return False
+
+    chat_id = chat["id"]
+    game = NOICHU_GAMES.get(chat_id)
+
+    if not game or game.get("status") != "playing":
+        return False
+
+    user = message.get("from", {})
+    user_id = user.get("id")
+    text = (message.get("text") or "").strip()
+
+    if not text or not user_id:
+        return False
+
+    # Chỉ người đã tham gia game mới được tính là người chơi
+    player_ids = game.get("players", [])
+
+    if user_id not in player_ids:
+        return False
+
+    # Chưa đến lượt
+    if game.get("current_player") != user_id:
+        await send_message(
+            chat_id,
+            "mày chưa đến lượt bớt tài lanh đi"
+        )
+        return True
+
+    # Chuẩn hóa câu người chơi nhập
+    phrase = noichu_norm(text)
+
+    if not phrase:
+        return True
+
+    # Không cho nhập quá dài
+    if len(phrase) > 100:
+        await send_message(
+            chat_id,
+            "Câu quá dài, tối đa 100 ký tự."
+        )
+        return True
+
+    previous_phrase = game.get("last_phrase", "")
+
+    # Nếu đây không phải lượt đầu tiên:
+    # từ đầu câu mới phải nối được với từ cuối câu trước
+    if previous_phrase:
+        required_word = noichu_last_word(previous_phrase)
+        first_word = noichu_first_word(phrase)
+
+        if not required_word or not first_word or first_word != required_word:
+            # Người chơi nói sai -> bị loại
+            game.setdefault("eliminated", set()).add(user_id)
+
+            if user_id in game["players"]:
+                game["players"].remove(user_id)
+
+            name = noichu_name(user)
+
+            await send_message(
+                chat_id,
+                f"❌ {name} đã nối sai và bị loại khỏi trò chơi!"
+            )
+
+            # Nếu chỉ còn 1 người
+            if len(game["players"]) <= 1:
+                await noichu_finish(chat_id)
+                return True
+
+            # Chuyển lượt
+            game["last_phrase"] = previous_phrase
+            game["last_player"] = None
+
+            await noichu_next_turn(chat_id)
+            return True
+
+    # ===== NỐI ĐÚNG =====
+
+    now = time.time()
+
+    turn_started = game.get("turn_started_at", now)
+    response_time = max(0.1, now - turn_started)
+
+    # Ghi thống kê
+    stats = game.setdefault(
+        "stats",
+        {}
+    )
+
+    user_stats = stats.setdefault(
+        user_id,
+        {
+            "valid": 0,
+            "invalid": 0,
+            "total_time": 0.0,
+            "best_time": None,
+            "total_length": 0
+        }
+    )
+
+    user_stats["valid"] += 1
+    user_stats["total_time"] += response_time
+    user_stats["total_length"] += len(phrase.split())
+
+    if (
+        user_stats["best_time"] is None
+        or response_time < user_stats["best_time"]
+    ):
+        user_stats["best_time"] = response_time
+
+    # Lưu câu vừa nói
+    game["last_phrase"] = phrase
+    game["last_player"] = user_id
+
+    # Lưu thời gian để tính lượt tiếp theo
+    game["last_response_time"] = response_time
+
+    # Thông báo câu hợp lệ
+    await send_message(
+        chat_id,
+        f"✅ {noichu_name(user)}: {phrase}"
+    )
+
+    # Chuyển lượt tiếp theo
+    await noichu_next_turn(chat_id)
+
+    return True
 
 async def process_update(
     update
@@ -1867,7 +3149,7 @@ async def polling_loop():
 # ============================================================
 
 # ============================================================
-# THEONE BOT - PURE PYTHON VERSION
+# NGỌC MỸ - PURE PYTHON VERSION
 # PHẦN 3/10
 # UTILITY COMMANDS
 # /echo /calc /search /weather /short
@@ -8439,6 +9721,68 @@ async def process_update(
             message
         )
 
+# ============================================================
+# LEVEL - TỰ ĐỘNG ĐẾM TIN NHẮN
+# ============================================================
+
+    if (
+            is_group(message)
+            and user
+            and not user.get("is_bot", False)
+        ):
+
+        try:
+
+            level_count, old_level, new_level = add_level_message(
+                chat_id(message),
+                user.get("id"),
+                user.get("username"),
+                user.get("first_name", "Người dùng")
+            )
+
+            # Chỉ thông báo khi vừa lên level
+            if new_level > old_level:
+
+                username = user.get("username")
+
+                if username:
+                    mention = f"@{username}"
+                else:
+                    mention = (
+                        f'<a href="tg://user?id={user.get("id")}">'
+                        f'{html.escape(user.get("first_name", "Người dùng"))}'
+                        f'</a>'
+                    )
+
+                if new_level < 10:
+
+                    await send_message(
+                        chat_id(message),
+                        (
+                            f"🎉 Chúc Mừng {mention} đã lên level {new_level}\n"
+                            f"để lên level tiếp theo vui lòng rõ lệnh /levelnhiemvu"
+                        ),
+                        parse_mode="HTML"
+                    )
+
+                else:
+
+                    await send_message(
+                        chat_id(message),
+                        (
+                            f"🏆 Chúc Mừng {mention} đã đạt LEVEL 10!\n"
+                            f"🔥 Bạn đã đạt cấp độ tối đa."
+                        ),
+                        parse_mode="HTML"
+                    )
+
+        except Exception as e:
+
+            logger.exception(
+                "LEVEL MESSAGE ERROR: %s",
+                e
+            )
+
     RUNTIME_STATS[
         "messages"
     ] += 1
@@ -9101,3 +10445,4 @@ if __name__ == "__main__":
 # ============================================================
 # END PHẦN 10/10
 # ============================================================
+
