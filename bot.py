@@ -27,6 +27,32 @@ from urllib.request import Request, urlopen
 
 BOT_TOKEN = "8976236384:AAEpZ_w0uCKliDe4ip8IA-FWX0_8j1UhX5k"
 
+# ============================================================
+# OPENAI AI
+# ============================================================
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Nếu chưa dùng biến môi trường, có thể đặt trực tiếp:
+# OPENAI_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+
+OPENAI_MODEL = "gpt-5.6-luna"
+
+AI_SYSTEM_PROMPT = """
+Bạn là Ngọc Mỹ, trợ lý AI của Telegram bot.
+
+Quy tắc:
+- Trả lời bằng tiếng Việt nếu người dùng hỏi bằng tiếng Việt.
+- Có thể trả lời English nếu người dùng dùng English.
+- Trả lời tự nhiên, dễ hiểu.
+- Nếu câu hỏi cần tính toán, hãy tính cẩn thận.
+- Không tự nhận mình là con người.
+- Không nói rằng bạn là chính ChatGPT trong ứng dụng ChatGPT.
+- Bạn là AI được tích hợp vào bot Ngọc Mỹ.
+- Nếu không chắc chắn về thông tin, nói rõ mức độ không chắc chắn.
+- Không bịa nguồn hoặc thông tin.
+"""
+
 OWNER_USERNAME = "DTN_207"
 OWNER_DISPLAY = "@DTN_207"
 
@@ -2343,7 +2369,13 @@ def start_main_keyboard():
                     "text": "🧰 Tiện ích khác",
                     "callback_data": "start_utils"
                 }
-            ]
+            ],
+            [
+                {
+                    "text": "🤖 Ngọc Mỹ AI",
+                    "callback_data": "start_ai"
+                }
+            ],
         ]
     }
 
@@ -3148,6 +3180,130 @@ async def noichu_handle_text(message):
 
     return True
 
+# ============================================================
+# OPENAI AI
+# ============================================================
+async def command_ai(message):
+    chat_id = message.get("chat", {}).get("id")
+    text = message.get("text", "") or ""
+
+    parts = text.split(maxsplit=1)
+
+    if len(parts) < 2:
+        await send_message(
+            chat_id,
+            "🤖 Ngọc Mỹ AI\n\n"
+            "Dùng:\n"
+            "/ai <câu hỏi>\n\n"
+            "Ví dụ:\n"
+            "/ai Trái Đất có bao nhiêu đại dương?"
+        )
+        return
+
+    question = parts[1].strip()
+
+    if len(question) > 10000:
+        await send_message(
+            chat_id,
+            "❌ Câu hỏi quá dài. Tối đa 10.000 ký tự."
+        )
+        return
+
+    await send_message(
+        chat_id,
+        "🤖 Đang suy nghĩ..."
+    )
+
+    answer = await asyncio.to_thread(
+        openai_ai_request,
+        question
+    )
+
+    if len(answer) <= 4000:
+        await send_message(
+            chat_id,
+            "🤖 Ngọc Mỹ AI:\n\n" + answer
+        )
+        return
+
+    for i in range(0, len(answer), 4000):
+        await send_message(
+            chat_id,
+            answer[i:i + 4000]
+        )
+
+# ============================================================
+# OPENAI AI
+# ============================================================
+
+def openai_ai_request(question):
+    if not OPENAI_API_KEY:
+        return "❌ AI chưa được cấu hình API Key."
+
+    url = "https://api.openai.com/v1/responses"
+
+    payload = {
+        "model": OPENAI_MODEL,
+        "instructions": AI_SYSTEM_PROMPT,
+        "input": question,
+        "max_output_tokens": 2000
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + OPENAI_API_KEY
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=90) as response:
+            result = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        if result.get("output_text"):
+            return result["output_text"].strip()
+
+        texts = []
+
+        for item in result.get("output", []):
+            if item.get("type") == "message":
+                for content in item.get("content", []):
+                    if content.get("type") == "output_text":
+                        if content.get("text"):
+                            texts.append(content["text"])
+
+        answer = "\n".join(texts).strip()
+
+        if answer:
+            return answer
+
+        return "❌ AI không trả về câu trả lời."
+
+    except urllib.error.HTTPError as e:
+        try:
+            error = json.loads(
+                e.read().decode("utf-8")
+            )
+            msg = error.get("error", {}).get("message")
+
+            if msg:
+                return "❌ OpenAI API lỗi:\n" + msg
+
+        except Exception:
+            pass
+
+        return f"❌ OpenAI API lỗi HTTP {e.code}."
+
+    except Exception as e:
+        return f"❌ Lỗi AI: {e}"
+
 async def process_update(
     update
 ):
@@ -3209,10 +3365,13 @@ async def process_update(
 
                 return
 
-    await dispatch_command(
-        message
-    )
+        await dispatch_command(
+            message
+        )
 
+        await _original_process_update(
+            update
+        )
 
 # ============================================================
 # GET UPDATES
@@ -8079,6 +8238,9 @@ async def process_update(
         message
     )
 
+    await _previous_process_update_v6(
+        update
+    )
 
 # ============================================================
 # END PHẦN 7/10
@@ -8519,6 +8681,24 @@ async def process_callback_update(
         "data"
     )
 
+    if data == "start_ai":
+        await answer_callback(
+            callback.get("id"),
+            "🤖 Ngọc Mỹ AI đã mở!"
+        )
+
+        await send_message(
+            callback.get("message", {}).get("chat", {}).get("id"),
+            "🤖 <b>NGỌC MỸ AI</b>\n\n"
+            "Hãy gửi câu hỏi cho mình bằng lệnh:\n"
+            "<code>/ai câu hỏi của bạn</code>\n\n"
+            "Ví dụ:\n"
+            "<code>/ai Trái Đất có bao nhiêu đại dương?</code>",
+            parse_mode="HTML"
+        )
+
+        return
+
     # Điểm danh
     if data == "daily_checkin":
 
@@ -8697,6 +8877,9 @@ async def process_update(
         message
     )
 
+    await _previous_process_update_v7(
+        update
+    )
 
 # ============================================================
 # UPDATE GETUPDATES
@@ -10032,6 +10215,9 @@ async def process_update(
         message
     )
 
+    await _previous_process_update_v8(
+        update
+    )
 
 # ============================================================
 # END PHẦN 9/10
