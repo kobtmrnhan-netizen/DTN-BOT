@@ -2325,6 +2325,227 @@ async def noichu_finish(chat_id, winner_id):
         chat_id
     )
 
+# ============================================================
+# START MENU - NGỌC MỸ
+# ============================================================
+
+def start_main_keyboard():
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "👑 Quản trị",
+                    "callback_data": "start_admin"
+                }
+            ],
+            [
+                {
+                    "text": "🧰 Tiện ích khác",
+                    "callback_data": "start_utils"
+                }
+            ]
+        ]
+    }
+
+
+def start_back_keyboard():
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "🔙 Quay lại",
+                    "callback_data": "start_home"
+                }
+            ]
+        ]
+    }
+
+
+def start_admin_text():
+    return (
+        "👑 <b>QUẢN TRỊ NHÓM</b>\n\n"
+
+        "⚠️ <b>/warn</b> — Cảnh cáo thành viên.\n"
+        "Cách dùng: <code>/warn @username [lý do]</code> hoặc reply.\n\n"
+
+        "📋 <b>/warns</b> — Xem cảnh cáo.\n"
+        "Cách dùng: <code>/warns @username</code> hoặc reply.\n\n"
+
+        "🔇 <b>/mute</b> — Khóa thành viên chat.\n"
+        "Cách dùng: <code>/mute @username 10m</code> hoặc reply.\n\n"
+
+        "🔊 <b>/unmute</b> — Mở khóa thành viên.\n"
+        "Cách dùng: <code>/unmute @username</code> hoặc reply.\n\n"
+
+        "🚪 <b>/kick</b> — Đá thành viên.\n"
+        "Cách dùng: <code>/kick @username</code> hoặc reply.\n\n"
+
+        "🚫 <b>/ban</b> — Cấm thành viên.\n"
+        "Cách dùng: <code>/ban @username</code> hoặc reply.\n\n"
+
+        "♻️ <b>/unban</b> — Gỡ cấm thành viên.\n"
+        "Cách dùng: <code>/unban @username</code> hoặc reply.\n\n"
+
+        "🗑 <b>/purge</b> — Xóa nhiều tin nhắn.\n"
+        "Cách dùng: <code>/purge 10</code>.\n\n"
+
+        "📌 <b>/pin</b> — Ghim tin nhắn.\n"
+        "Cách dùng: reply tin nhắn rồi dùng <code>/pin</code>.\n\n"
+
+        "📍 <b>/unpin</b> — Bỏ ghim.\n"
+        "Cách dùng: <code>/unpin</code>.\n\n"
+
+        "🔒 <b>/lock</b> — Khóa nhóm.\n"
+        "Cách dùng: <code>/lock</code>.\n\n"
+
+        "🔓 <b>/unlock</b> — Mở khóa nhóm.\n"
+        "Cách dùng: <code>/unlock</code>.\n\n"
+
+        "🛡 <b>BẢO VỆ NHÓM</b>\n"
+        "<code>/antispam on|off</code> — Chống spam.\n"
+        "<code>/antilink on|off</code> — Chống link.\n"
+        "<code>/antibuff on|off</code> — Chống buff thành viên.\n"
+        "<code>/antifake on|off</code> — Chống giả mạo."
+    )
+
+
+def start_utils_text():
+    return (
+        "🧰 <b>TIỆN ÍCH KHÁC</b>\n\n"
+
+        "⭐ <b>LEVEL</b>\n"
+        "<code>/level</code> — Xem hệ thống level.\n"
+        "<code>/levelyou</code> — Xem level của bạn.\n"
+        "<code>/levelbxh</code> — Xem bảng xếp hạng.\n"
+        "<code>/leveldanhsach</code> — Xem điều kiện lên level.\n"
+        "<code>/levelnhiemvu</code> — Xem nhiệm vụ tiếp theo.\n\n"
+
+        "🎮 <b>GAME NỐI CHỮ</b>\n"
+        "<code>/noichu</code> — Mở game Nối Chữ Việt Nam.\n"
+        "Cách dùng: dùng <code>/noichu</code> trong nhóm rồi bấm "
+        "<b>THAM GIA</b>.\n"
+        "Bot không cần là admin.\n\n"
+
+        "🔥 <b>ĐIỂM DANH</b>\n"
+        "<code>/diemdanh</code> — Điểm danh hằng ngày.\n\n"
+
+        "❤️ <b>THƠ</b>\n"
+        "<code>/thotinh</code> — Random thơ tình.\n"
+        "<code>/thodoi</code> — Random thơ đời.\n\n"
+
+        "💤 <b>AFK</b>\n"
+        "<code>/afk [lý do]</code> — Bật trạng thái AFK.\n\n"
+
+        "🔎 <b>FILTER</b>\n"
+        "<code>/filter từ khóa | nội dung</code> — Tạo phản hồi tự động.\n"
+        "<code>/filters</code> — Xem filter.\n"
+        "<code>/stopfilter từ khóa</code> — Xóa filter.\n\n"
+
+        "🛠 <b>TIỆN ÍCH</b>\n"
+        "<code>/id</code> — Xem ID.\n"
+        "<code>/info</code> — Xem thông tin.\n"
+        "<code>/ping</code> — Kiểm tra bot.\n"
+        "<code>/time</code> — Xem thời gian.\n"
+        "<code>/stats</code> — Xem thống kê.\n"
+        "<code>/echo nội dung</code> — Bot lặp lại nội dung.\n"
+        "<code>/calc phép_tính</code> — Tính toán.\n"
+        "<code>/search từ khóa</code> — Tìm kiếm.\n"
+        "<code>/weather địa điểm</code> — Xem thời tiết.\n"
+        "<code>/short link</code> — Rút gọn liên kết."
+    )
+
+
+async def send_start_menu(message):
+
+    user = from_user(message) or {}
+
+    username = user.get("username")
+
+    if username:
+        greeting = "@" + html.escape(username)
+    else:
+        greeting = html.escape(
+            user.get("first_name", "bạn")
+        )
+
+    text = (
+        f"👋 <b>Chào {greeting}, tôi là Ngọc Mỹ.</b>\n\n"
+        "Tôi có nhiều công cụ hữu ích. "
+        "Chạm vào một module bên dưới để xem lệnh.\n\n"
+        "Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸"
+    )
+
+    await api(
+        "sendMessage",
+        {
+            "chat_id": chat_id(message),
+            "text": text,
+            "parse_mode": "HTML",
+            "reply_markup": json.dumps(
+                start_main_keyboard()
+            )
+        }
+    )
+
+
+async def handle_start_menu_callback(callback):
+
+    data = callback.get("data")
+    message = callback.get("message") or {}
+    callback_id = callback.get("id")
+
+    if data == "start_home":
+
+        text = (
+            "🏠 <b>Chào mừng trở lại với Ngọc Mỹ.</b>\n\n"
+            "Tôi có nhiều công cụ hữu ích. "
+            "Chạm vào một module bên dưới để xem lệnh.\n\n"
+            "Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸"
+        )
+
+        keyboard = start_main_keyboard()
+
+    elif data == "start_admin":
+
+        text = start_admin_text()
+        keyboard = start_back_keyboard()
+
+    elif data == "start_utils":
+
+        text = start_utils_text()
+        keyboard = start_back_keyboard()
+
+    else:
+
+        return False
+
+    await api(
+        "editMessageText",
+        {
+            "chat_id": message.get(
+                "chat",
+                {}
+            ).get("id"),
+
+            "message_id":
+                message.get("message_id"),
+
+            "text": text,
+
+            "parse_mode": "HTML",
+
+            "reply_markup":
+                json.dumps(keyboard)
+        }
+    )
+
+    await answer_callback(
+        callback_id,
+        ""
+    )
+
+    return True
+
 async def command_start(
     message
 ):
@@ -2333,27 +2554,13 @@ async def command_start(
         message
     )
 
-    await save_user(
-        user
-    )
-
-    name = html.escape(
-        user_full_name(user)
-    )
-
-    await send_message(
-        chat_id(message),
-        (
-            f"👋 <b>Xin chào {name}!</b>\n\n"
-            f"🤖 Chào mừng đến với "
-            f"<b>NGỌC MỸ</b>.\n\n"
-            f"🛡 Quản lý nhóm\n"
-            f"⚙️ Tiện ích\n"
-            f"🔐 Bảo vệ nhóm\n"
-            f"🔥 Điểm danh\n\n"
-            f"📚 Dùng <code>/help</code> "
-            f"để xem toàn bộ lệnh."
+    if user:
+        await save_user(
+            user
         )
+
+    await send_start_menu(
+        message
     )
 
     message
@@ -8302,10 +8509,17 @@ async def process_callback_update(
     if not callback:
         return
 
+    # Menu /start
+    if await handle_start_menu_callback(
+        callback
+    ):
+        return
+
     data = callback.get(
         "data"
     )
 
+    # Điểm danh
     if data == "daily_checkin":
 
         await handle_daily_checkin(
@@ -8318,7 +8532,6 @@ async def process_callback_update(
         callback.get("id"),
         "❌ Nút không còn hiệu lực."
     )
-
 
 # ============================================================
 # REGISTER POEM + CHECK-IN
