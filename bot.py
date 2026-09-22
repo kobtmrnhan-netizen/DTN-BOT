@@ -1,7 +1,7 @@
 # ============================================================
-# THEONE BOT - PURE PYTHON VERSION
-# PHẦN 1/10
-# KHÔNG AIogram - KHÔNG aiohttp - KHÔNG aiosqlite
+# NGỌC MỸ BOT - PURE PYTHON
+# PHẦN 1/15
+# KHÔNG AI
 # ============================================================
 
 import asyncio
@@ -25,33 +25,7 @@ from urllib.request import Request, urlopen
 # CONFIG
 # ============================================================
 
-BOT_TOKEN = "8976236384:AAEpZ_w0uCKliDe4ip8IA-FWX0_8j1UhX5k"
-
-# ============================================================
-# OPENAI AI
-# ============================================================
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Nếu chưa dùng biến môi trường, có thể đặt trực tiếp:
-# OPENAI_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
-
-OPENAI_MODEL = "gpt-5.6-luna"
-
-AI_SYSTEM_PROMPT = """
-Bạn là Ngọc Mỹ, trợ lý AI của Telegram bot.
-
-Quy tắc:
-- Trả lời bằng tiếng Việt nếu người dùng hỏi bằng tiếng Việt.
-- Có thể trả lời English nếu người dùng dùng English.
-- Trả lời tự nhiên, dễ hiểu.
-- Nếu câu hỏi cần tính toán, hãy tính cẩn thận.
-- Không tự nhận mình là con người.
-- Không nói rằng bạn là chính ChatGPT trong ứng dụng ChatGPT.
-- Bạn là AI được tích hợp vào bot Ngọc Mỹ.
-- Nếu không chắc chắn về thông tin, nói rõ mức độ không chắc chắn.
-- Không bịa nguồn hoặc thông tin.
-"""
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 OWNER_USERNAME = "DTN_207"
 OWNER_DISPLAY = "@DTN_207"
@@ -80,7 +54,7 @@ logging.basicConfig(
     )
 )
 
-logger = logging.getLogger("THEONE")
+logger = logging.getLogger("NGOC_MY")
 
 
 # ============================================================
@@ -156,7 +130,6 @@ def db_execute(
     conn = db_connect()
 
     try:
-
         cursor = conn.cursor()
 
         cursor.execute(
@@ -165,15 +138,12 @@ def db_execute(
         )
 
         if fetch:
-
             result = cursor.fetchall()
 
         elif fetchone:
-
             result = cursor.fetchone()
 
         else:
-
             result = None
 
         conn.commit()
@@ -181,7 +151,6 @@ def db_execute(
         return result
 
     finally:
-
         conn.close()
 
 
@@ -191,9 +160,7 @@ async def adb_execute(
     fetch=False,
     fetchone=False
 ):
-
     async with DB_LOCK:
-
         return await asyncio.to_thread(
             db_execute,
             query,
@@ -295,10 +262,12 @@ def init_db():
         conn.commit()
 
     finally:
-
         conn.close()
 
-# ==================== LEVEL SYSTEM ====================
+
+# ============================================================
+# LEVEL SYSTEM
+# ============================================================
 
 LEVEL_REQUIREMENTS = {
     1: 0,
@@ -315,54 +284,90 @@ LEVEL_REQUIREMENTS = {
 
 
 def calculate_level(message_count):
+
     current_level = 1
 
     for level, required in LEVEL_REQUIREMENTS.items():
+
         if message_count >= required:
             current_level = level
 
     return current_level
 
 
-def get_level_data(chat_id, user_id):
+def get_level_data(
+    chat_id,
+    user_id
+):
+
     conn = db_connect()
 
     row = conn.execute(
         """
-        SELECT chat_id, user_id, username, first_name,
-               message_count, level, updated_at
+        SELECT
+            chat_id,
+            user_id,
+            username,
+            first_name,
+            message_count,
+            level,
+            updated_at
         FROM levels
-        WHERE chat_id = ? AND user_id = ?
+        WHERE chat_id = ?
+        AND user_id = ?
         """,
-        (chat_id, user_id)
+        (
+            chat_id,
+            user_id
+        )
     ).fetchone()
 
     conn.close()
+
     return row
 
 
-def add_level_message(chat_id, user_id, username, first_name):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def add_level_message(
+    chat_id,
+    user_id,
+    username,
+    first_name
+):
+
+    now = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
 
     conn = db_connect()
 
     row = conn.execute(
         """
-        SELECT message_count, level
+        SELECT
+            message_count,
+            level
         FROM levels
-        WHERE chat_id = ? AND user_id = ?
+        WHERE chat_id = ?
+        AND user_id = ?
         """,
-        (chat_id, user_id)
+        (
+            chat_id,
+            user_id
+        )
     ).fetchone()
 
     if row:
+
         message_count = row[0] + 1
         old_level = row[1]
+
     else:
+
         message_count = 1
         old_level = 1
 
-    new_level = calculate_level(message_count)
+    new_level = calculate_level(
+        message_count
+    )
 
     conn.execute(
         """
@@ -380,11 +385,20 @@ def add_level_message(chat_id, user_id, username, first_name):
 
         ON CONFLICT(chat_id, user_id)
         DO UPDATE SET
-            username = excluded.username,
-            first_name = excluded.first_name,
-            message_count = excluded.message_count,
-            level = excluded.level,
-            updated_at = excluded.updated_at
+            username =
+                excluded.username,
+
+            first_name =
+                excluded.first_name,
+
+            message_count =
+                excluded.message_count,
+
+            level =
+                excluded.level,
+
+            updated_at =
+                excluded.updated_at
         """,
         (
             chat_id,
@@ -400,10 +414,10 @@ def add_level_message(chat_id, user_id, username, first_name):
     conn.commit()
     conn.close()
 
-    return message_count, old_level, new_level
-
-    logger.info(
-        "Database initialized."
+    return (
+        message_count,
+        old_level,
+        new_level
     )
 
 
@@ -411,19 +425,18 @@ def add_level_message(chat_id, user_id, username, first_name):
 # TELEGRAM API
 # ============================================================
 
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+
 def telegram_request(
     method,
     data=None,
     timeout=30
 ):
 
-    if not BOT_TOKEN or (
-        BOT_TOKEN
-        == "DÁN_TOKEN_BOT_CỦA_BẠN_VÀO_ĐÂY"
-    ):
+    if not BOT_TOKEN:
 
         raise RuntimeError(
-            "Bạn chưa nhập BOT_TOKEN."
+            "Bạn chưa cấu hình BOT_TOKEN."
         )
 
     data = data or {}
@@ -488,6 +501,7 @@ async def api(
     data=None,
     timeout=30
 ):
+
     return await asyncio.to_thread(
         telegram_request,
         method,
@@ -513,7 +527,6 @@ async def send_message(
     }
 
     if parse_mode:
-
         data["parse_mode"] = parse_mode
 
     if reply_to:
@@ -597,14 +610,16 @@ async def unpin_message(
 def user_name(user):
 
     if not user:
-
         return "Unknown"
 
     return (
         user.get("first_name")
         or user.get("username")
         or str(
-            user.get("id", "Unknown")
+            user.get(
+                "id",
+                "Unknown"
+            )
         )
     )
 
@@ -612,7 +627,6 @@ def user_name(user):
 def user_full_name(user):
 
     if not user:
-
         return "Unknown"
 
     first = user.get(
@@ -633,16 +647,13 @@ def user_full_name(user):
 def mention_user(user):
 
     if not user:
-
         return "Unknown"
 
     name = html.escape(
         user_full_name(user)
     )
 
-    user_id = user.get(
-        "id"
-    )
+    user_id = user.get("id")
 
     return (
         f'<a href="tg://user?id={user_id}">'
@@ -654,14 +665,11 @@ def mention_user(user):
 async def save_user(user):
 
     if not user:
-
         return
 
-    now = (
-        datetime.now(
-            timezone.utc
-        ).isoformat()
-    )
+    now = datetime.now(
+        timezone.utc
+    ).isoformat()
 
     await adb_execute(
         """
@@ -710,491 +718,86 @@ async def save_user(user):
 
 def is_group(message):
 
+    chat = (
+        message or {}
+    ).get(
+        "chat",
+        {}
+    )
+
     return (
-        message.get("chat", {})
-        .get("type")
+        chat.get("type")
         in GROUP_TYPES
     )
 
 
 def is_private(message):
 
+    chat = (
+        message or {}
+    ).get(
+        "chat",
+        {}
+    )
+
     return (
-        message.get("chat", {})
-        .get("type")
+        chat.get("type")
         == PRIVATE_TYPE
     )
 
 
-def chat_id(message):
+def get_chat_id(message):
 
     return (
-        message.get("chat", {})
+        message
+        .get("chat", {})
         .get("id")
     )
 
 
-def message_id(message):
+def get_user(message):
 
-    return message.get(
-        "message_id"
-    )
-
-
-def from_user(message):
-
-    return message.get(
+    return (
+        message or {}
+    ).get(
         "from"
     )
 
 
-# ============================================================
-# PERMISSION
-# ============================================================
+def get_user_id(message):
 
-def is_owner(user):
+    user = get_user(message)
 
     if not user:
-
-        return False
-
-    username = (
-        user.get("username")
-        or ""
-    ).lower()
-
-    return (
-        username
-        == OWNER_USERNAME.lower()
-    )
-
-
-async def get_chat_member(
-    chat_id_value,
-    user_id
-):
-
-    result = await api(
-        "getChatMember",
-        {
-            "chat_id": chat_id_value,
-            "user_id": user_id
-        }
-    )
-
-    if not result.get("ok"):
-
         return None
 
-    return result.get(
-        "result"
-    )
+    return user.get("id")
 
 
-async def is_admin(
-    message
-):
-
-    user = from_user(
-        message
-    )
-
-    if not user:
-
-        return False
-
-    if is_owner(user):
-
-        return True
-
-    if not is_group(message):
-
-        return False
-
-    member = await get_chat_member(
-        chat_id(message),
-        user.get("id")
-    )
-
-    if not member:
-
-        return False
-
-    return member.get(
-        "status"
-    ) in {
-        "administrator",
-        "creator"
-    }
-
-
-async def require_group(
-    message
-):
-
-    if not is_group(message):
-
-        await send_message(
-            chat_id(message),
-            PRIVATE_GROUP_MESSAGE
-        )
-
-        return False
-
-    return True
-
-
-async def require_admin(
-    message
-):
-
-    if not await require_group(
-        message
-    ):
-
-        return False
-
-    if not await is_admin(
-        message
-    ):
-
-        await send_message(
-            chat_id(message),
-            ADMIN_ONLY_MESSAGE
-        )
-
-        return False
-
-    return True
-
-
-async def require_owner(
-    message
-):
-
-    if not is_owner(
-        from_user(message)
-    ):
-
-        await send_message(
-            chat_id(message),
-            OWNER_ONLY_MESSAGE
-        )
-
-        return False
-
-    return True
-
-
-# ============================================================
-# SETTINGS
-# ============================================================
-
-async def get_setting(
-    chat_id_value,
-    key,
-    default=False
-):
-
-    row = await adb_execute(
-        """
-        SELECT value
-        FROM settings
-        WHERE chat_id = ?
-        AND key = ?
-        """,
-        (
-            chat_id_value,
-            key
-        ),
-        fetchone=True
-    )
-
-    if not row:
-
-        return default
+def get_message_id(message):
 
     return (
-        str(row["value"])
-        == "1"
+        message or {}
+    ).get(
+        "message_id"
     )
 
-
-async def set_setting(
-    chat_id_value,
-    key,
-    value
-):
-
-    await adb_execute(
-        """
-        INSERT INTO settings (
-            chat_id,
-            key,
-            value
-        )
-        VALUES (?, ?, ?)
-
-        ON CONFLICT(
-            chat_id,
-            key
-        )
-        DO UPDATE SET
-            value =
-                excluded.value
-        """,
-        (
-            chat_id_value,
-            key,
-            "1" if value else "0"
-        )
-    )
-
-
-# ============================================================
-# DURATION
-# ============================================================
-
-def parse_duration(text):
-
-    if not text:
-
-        return None
-
-    match = re.fullmatch(
-        r"(\d+)\s*(s|m|h|d|w)",
-        text.lower()
-    )
-
-    if not match:
-
-        return None
-
-    number = int(
-        match.group(1)
-    )
-
-    unit = match.group(2)
-
-    multipliers = {
-        "s": 1,
-        "m": 60,
-        "h": 3600,
-        "d": 86400,
-        "w": 604800
-    }
-
-    return (
-        number
-        * multipliers[unit]
-    )
-
-
-def format_duration(
-    seconds
-):
-
-    seconds = int(seconds)
-
-    if seconds < 60:
-
-        return f"{seconds}s"
-
-    if seconds < 3600:
-
-        return (
-            f"{seconds // 60}m"
-        )
-
-    if seconds < 86400:
-
-        return (
-            f"{seconds // 3600}h"
-        )
-
-    return (
-        f"{seconds // 86400}d"
-    )
-
-
-# ============================================================
-# UPTIME
-# ============================================================
-
-def get_uptime():
-
-    seconds = int(
-        time.time()
-        - START_TIME
-    )
-
-    days, seconds = divmod(
-        seconds,
-        86400
-    )
-
-    hours, seconds = divmod(
-        seconds,
-        3600
-    )
-
-    minutes, seconds = divmod(
-        seconds,
-        60
-    )
-
-    parts = []
-
-    if days:
-
-        parts.append(
-            f"{days}d"
-        )
-
-    if hours:
-
-        parts.append(
-            f"{hours}h"
-        )
-
-    if minutes:
-
-        parts.append(
-            f"{minutes}m"
-        )
-
-    parts.append(
-        f"{seconds}s"
-    )
-
-    return " ".join(
-        parts
-    )
-
-
-# ============================================================
-# BOT BAN
-# ============================================================
-
-async def is_bot_banned(
-    user_id
-):
-
-    row = await adb_execute(
-        """
-        SELECT user_id
-        FROM bot_bans
-        WHERE user_id = ?
-        """,
-        (
-            user_id,
-        ),
-        fetchone=True
-    )
-
-    return row is not None
-
-
-# ============================================================
-# STARTUP
-# ============================================================
-
-async def startup():
-
-    if (
-        not BOT_TOKEN
-        or BOT_TOKEN
-        == "DÁN_TOKEN_BOT_CỦA_BẠN_VÀO_ĐÂY"
-    ):
-
-        raise RuntimeError(
-            "Bạn chưa nhập BOT_TOKEN "
-            "trong bot.py"
-        )
-
-    init_db()
-
-    me = await api(
-        "getMe"
-    )
-
-    if not me.get("ok"):
-
-        raise RuntimeError(
-            "BOT TOKEN không hợp lệ "
-            "hoặc Telegram API không phản hồi."
-        )
-
-    bot_user = me.get(
-        "result",
-        {}
-    )
-
-    logger.info(
-        "=========================================="
-    )
-
-    logger.info(
-        "Ngọc Mỹ v%s",
-        VERSION
-    )
-
-    logger.info(
-        "Bot: @%s",
-        bot_user.get(
-            "username",
-            "unknown"
-        )
-    )
-
-    logger.info(
-        "Owner: %s",
-        OWNER_DISPLAY
-    )
-
-    logger.info(
-        "Pure Python Telegram API mode"
-    )
-
-    logger.info(
-        "=========================================="
-    )
-
-
-# ============================================================
-# END PHẦN 1/10
-# ============================================================
-
-# ============================================================
-# NGỌC MỸ - PURE PYTHON VERSION
-# PHẦN 2/10
-# UPDATE POLLING + COMMAND ROUTER + BASIC COMMANDS
-# ============================================================
-
-
-# ============================================================
-# UPDATE STATE
-# ============================================================
-
-LAST_UPDATE_ID = 0
-
-
-# ============================================================
-# TEXT / COMMAND HELPERS
-# ============================================================
 
 def get_text(message):
 
     return (
-        message.get("text")
-        or message.get("caption")
-        or ""
-    )
+        message or {}
+    ).get(
+        "text",
+        ""
+    ) or ""
 
 
 def parse_command(message):
 
-    text = get_text(message).strip()
+    text = get_text(
+        message
+    ).strip()
 
     if not text.startswith("/"):
         return None, ""
@@ -1215,1582 +818,525 @@ def parse_command(message):
     command = command.lower()
 
     args = (
-        rest[0].strip()
+        rest[0]
         if rest
         else ""
-    )
+    ).strip()
 
     return command, args
 
+# ============================================================
+# GROUP / ADMIN HELPERS
+# ============================================================
 
-def command_args(
-    args
+async def get_chat_member(
+    chat_id,
+    user_id
 ):
 
-    if not args:
+    result = await api(
+        "getChatMember",
+        {
+            "chat_id": chat_id,
+            "user_id": user_id
+        }
+    )
 
-        return []
+    if not result.get("ok"):
+        return None
 
-    return args.split()
+    return result.get(
+        "result"
+    )
 
 
-# ============================================================
-# HELP
-# ============================================================
+async def is_admin(
+    chat_id,
+    user_id
+):
 
-help_text = (
-    "🤖 NGỌC MỸ — DANH SÁCH LỆNH\n\n"
-
-    "👤 LỆNH CƠ BẢN\n"
-    "/start → Khởi động và xem thông tin bot\n"
-    "/help → Xem toàn bộ hướng dẫn sử dụng\n"
-    "/id → Xem ID Telegram của bạn\n"
-    "/info → Xem thông tin người dùng\n"
-    "/ping → Kiểm tra bot có đang hoạt động\n"
-    "/time → Xem thời gian hiện tại\n"
-    "/stats → Xem thống kê bot\n"
-    "/settings → Xem cài đặt nhóm\n\n"
-
-    "🛠 TIỆN ÍCH\n"
-    "/echo → Bot nhắc lại nội dung bạn nhập\n"
-    "/calc → Tính phép tính nhanh\n"
-    "/search → Tìm kiếm thông tin\n"
-    "/weather → Xem thời tiết\n"
-    "/short → Rút gọn liên kết\n\n"
-
-    "🛡 QUẢN LÝ NHÓM\n"
-    "/warn → Cảnh cáo thành viên\n"
-    "/warns → Xem số lần cảnh cáo\n"
-    "/mute → Khóa chat thành viên\n"
-    "/unmute → Mở khóa chat\n"
-    "/kick → Đá thành viên khỏi nhóm\n"
-    "/ban → Cấm thành viên\n"
-    "/unban → Gỡ cấm thành viên\n"
-    "/purge → Xóa nhiều tin nhắn\n"
-    "/pin → Ghim tin nhắn\n"
-    "/unpin → Bỏ ghim tin nhắn\n"
-    "/lock → Khóa chat\n"
-    "/unlock → Mở khóa chat\n\n"
-
-    "👑 QUẢN TRỊ BOT\n"
-    "/admins → Xem quản trị viên\n"
-    "/broadcast → Gửi thông báo đến người dùng\n"
-    "/users → Xem danh sách người dùng bot\n"
-    "/banuser → Cấm người dùng sử dụng bot\n"
-    "/unbanuser → Gỡ cấm người dùng bot\n"
-    "/restart → Khởi động lại bot\n"
-    "/logs → Xem log hoạt động\n\n"
-
-    "⚙️ HỆ THỐNG\n"
-    "/database → Kiểm tra database\n"
-    "/health → Kiểm tra tình trạng bot\n"
-    "/version → Xem phiên bản bot\n\n"
-
-    "🛡 BẢO VỆ\n"
-    "/antispam on|off → Bật/tắt chống spam\n"
-    "/antilink on|off → Bật/tắt chống link\n"
-    "/antibuff on|off → Bật/tắt chống buff thành viên\n"
-    "/antifake on|off → Bật/tắt chống giả mạo\n\n"
-
-    "💤 AFK\n"
-    "/afk [lý do] → Bật trạng thái AFK\n"
-    "→ Bot thông báo khi có người nhắc đến bạn\n\n"
-
-    "🔎 FILTER\n"
-    "/filter → Tạo từ khóa tự động trả lời\n"
-    "/filters → Xem danh sách filter\n"
-    "/stopfilter → Xóa filter\n\n"
-
-    "❤️ THƠ\n"
-    "/thodoi → Random một bài thơ đời\n"
-    "/thotinh → Random một bài thơ tình\n\n"
-
-    "🔥 ĐIỂM DANH\n"
-    "/diemdanh → Mở bảng điểm danh hằng ngày\n"
-    "→ Tích điểm và duy trì chuỗi điểm danh\n\n"
-
-    "⭐ LEVEL\n"
-    "/level → Xem hệ thống level\n"
-    "/levelyou → Xem level hiện tại của bạn\n"
-    "/levelbxh → Xem bảng xếp hạng level trong nhóm\n"
-    "/leveldanhsach → Xem điều kiện lên từng level\n"
-    "/levelnhiemvu → Xem nhiệm vụ tiếp theo\n\n"
-
-    "🎮 TRÒ CHƠI — NỐI CHỮ VIỆT NAM\n"
-    "/noichu → Mở game Nối Chữ Việt Nam\n"
-    "→ Bấm nút THAM GIA để vào game\n"
-    "→ Cần ít nhất 2 người chơi\n"
-    "→ Game bắt đầu sau 3 phút\n"
-    "→ Người chơi phải nối từ đúng lượt\n"
-    "→ Nối sai sẽ bị loại\n"
-    "→ Người cuối cùng còn lại là người chiến thắng\n\n"
-
-    "👑 Owner: @DTN_207"
-)
-
-# ============================================================
-# BASIC COMMANDS
-# ============================================================
-
-# ==================== LEVEL COMMANDS ====================
-
-async def command_level(message, args=None):
-    if not is_group(message):
-        await send_message(
-            message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
-        )
-        return
-
-    chat_id = message["chat"]["id"]
-    user = message["from"]
-
-    username = user.get("username")
-    first_name = user.get("first_name", "Người dùng")
-
-    count, old_level, new_level = add_level_message(
+    member = await get_chat_member(
         chat_id,
-        user["id"],
-        username,
-        first_name
+        user_id
     )
 
-    if new_level > old_level:
-        mention = (
-            f"@{username}"
-            if username
-            else f'<a href="tg://user?id={user["id"]}">{html.escape(first_name)}</a>'
-        )
+    if not member:
+        return False
 
-        if new_level < 10:
-            await send_message(
-                chat_id,
-                f"🎉 Chúc Mừng {mention} đã lên level {new_level} "
-                f"để lên level tiếp theo vui lòng rõ lệnh /levelnhiemvu",
-                parse_mode="HTML"
-            )
-        else:
-            await send_message(
-                chat_id,
-                f"🏆 Chúc Mừng {mention} đã đạt LEVEL 10!\n"
-                f"🔥 Bạn đã đạt cấp độ tối đa của hệ thống Level.",
-                parse_mode="HTML"
-            )
-    else:
-        await send_message(
-            chat_id,
-            f"📊 Bạn hiện đang ở level {new_level} với {count} tin nhắn."
-        )
-
-
-async def command_levelyou(message, args=None):
-    if not is_group(message):
-        await send_message(
-            message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
-        )
-        return
-
-    chat_id = message["chat"]["id"]
-    user = message["from"]
-
-    row = get_level_data(chat_id, user["id"])
-
-    if not row:
-        count = 0
-        level = 1
-    else:
-        count = row["message_count"]
-        level = row["level"]
-
-    username = user.get("username")
-
-    if username:
-        name = f"@{username}"
-    else:
-        name = user.get("first_name", "Bạn")
-
-    await send_message(
-        chat_id,
-        f"👤 {name}\n"
-        f"⭐ Level hiện của bạn là level {level}\n"
-        f"💬 Số tin nhắn: {count}"
-    )
-
-
-async def command_leveldanhsach(message, args=None):
-    if not is_group(message):
-        await send_message(
-            message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
-        )
-        return
-
-    text = (
-        "📋 <b>ĐÂY LÀ DANH SÁCH ĐIỀU KIỆN LÊN LEVEL</b>\n\n"
-        "⭐ Level 1 → 0 tin nhắn\n"
-        "⭐ Level 2 → 100 tin nhắn\n"
-        "⭐ Level 3 → 300 tin nhắn\n"
-        "⭐ Level 4 → 500 tin nhắn\n"
-        "⭐ Level 5 → 700 tin nhắn\n"
-        "⭐ Level 6 → 900 tin nhắn\n"
-        "⭐ Level 7 → 1100 tin nhắn\n"
-        "⭐ Level 8 → 1300 tin nhắn\n"
-        "⭐ Level 9 → 1500 tin nhắn\n"
-        "🏆 Level 10 → 2000 tin nhắn\n\n"
-        "💡 Tin nhắn được cộng dồn liên tục."
-    )
-
-    await send_message(
-        message["chat"]["id"],
-        text,
-        parse_mode="HTML"
-    )
-
-
-async def command_levelnhiemvu(message, args=None):
-    if not is_group(message):
-        await send_message(
-            message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
-        )
-        return
-
-    chat_id = message["chat"]["id"]
-    user = message["from"]
-
-    row = get_level_data(chat_id, user["id"])
-
-    if not row:
-        count = 0
-        level = 1
-    else:
-        count = row["message_count"]
-        level = row["level"]
-
-    username = user.get("username")
-
-    if username:
-        name = f"@{username}"
-    else:
-        name = user.get("first_name", "Bạn")
-
-    if level >= 10:
-        await send_message(
-            chat_id,
-            f"🏆 Nhiệm vụ tiếp theo của {name}:\n"
-            f"Bạn đã đạt LEVEL 10 — cấp độ tối đa."
-        )
-        return
-
-    next_level = level + 1
-    required = LEVEL_REQUIREMENTS[next_level]
-    remaining = max(0, required - count)
-
-    await send_message(
-        chat_id,
-        f"🎯 Nhiệm vụ tiếp theo để lên level của bạn {name} là:\n\n"
-        f"⭐ Level hiện tại: {level}\n"
-        f"💬 Đã có: {count} tin nhắn\n"
-        f"🎯 Cần: {required} tin nhắn\n"
-        f"🔥 Còn thiếu: {remaining} tin nhắn"
-    )
-
-
-async def command_levelbxh(message, args=None):
-    if not is_group(message):
-        await send_message(
-            message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
-        )
-        return
-
-    chat_id = message["chat"]["id"]
-
-    conn = db_connect()
-
-    rows = conn.execute(
-        """
-        SELECT user_id, username, first_name, message_count, level
-        FROM levels
-        WHERE chat_id = ? AND level >= 2
-        ORDER BY level DESC, message_count DESC
-        """,
-        (chat_id,)
-    ).fetchall()
-
-    conn.close()
-
-    if not rows:
-        await send_message(
-            chat_id,
-            "📊 Đây là bản xếp hạng level trong nhóm.\n\n"
-            "Hiện chưa có thành viên nào đạt Level 2+."
-        )
-        return
-
-    lines = [
-        "🏆 <b>ĐÂY LÀ BẢN XẾP HẠNG LEVEL TRONG NHÓM</b>",
-        ""
-    ]
-
-    for index, row in enumerate(rows, 1):
-        username = row["username"]
-
-        if username:
-            name = f"@{username}"
-        else:
-            name = row["first_name"] or "Người dùng"
-
-        lines.append(
-            f"{index}. {name} — ⭐ Level {row['level']} "
-            f"💬 {row['message_count']} tin"
-        )
-
-    await send_message(
-        chat_id,
-        "\n".join(lines),
-        parse_mode="HTML"
-    )
-
-# ============================================================
-# 🎮 NỐI CHỮ VIỆT NAM - GAME STATE
-# ============================================================
-
-NOICHU_GAMES = {}
-NOICHU_TASKS = {}
-
-
-def noichu_normalize(text):
-    if not text:
-        return ""
-
-    return " ".join(
-        text.strip().lower().split()
-    )
-
-
-def noichu_first_word(text):
-    text = noichu_normalize(text)
-
-    if not text:
-        return ""
-
-    return text.split()[0]
-
-
-def noichu_last_word(text):
-    text = noichu_normalize(text)
-
-    if not text:
-        return ""
-
-    return text.split()[-1]
-
-
-def noichu_display_name(user):
-    username = user.get("username")
-
-    if username:
-        return f"@{username}"
-
-    return user.get(
-        "first_name",
-        "Người chơi"
-    )
-
-
-def noichu_create_game(chat_id):
-    game = {
-        "chat_id": chat_id,
-        "players": [],
-        "active_players": [],
-        "turn_order": [],
-        "current_player": None,
-        "last_phrase": None,
-        "last_word": None,
-        "started": False,
-        "started_at": None,
-        "turn_started_at": None,
-        "valid_answers": {},
-        "invalid_answers": {},
-        "response_times": {},
-        "total_words": {},
-        "rounds": 0,
-        "lobby_message_id": None,
+    return member.get(
+        "status"
+    ) in {
+        "administrator",
+        "creator"
     }
 
-    NOICHU_GAMES[chat_id] = game
 
-    return game
-
-
-def noichu_get_game(chat_id):
-    return NOICHU_GAMES.get(chat_id)
-
-
-def noichu_add_player(game, user):
-    user_id = user.get("id")
+async def is_owner(
+    user_id
+):
 
     if not user_id:
         return False
 
-    for player in game["players"]:
-        if player["id"] == user_id:
-            return False
+    # Cho phép Owner theo ID nếu đã cấu hình
+    owner_id = os.getenv(
+        "OWNER_ID",
+        ""
+    ).strip()
 
-    game["players"].append({
-        "id": user_id,
-        "username": user.get("username"),
-        "first_name": user.get(
-            "first_name",
-            "Người chơi"
-        ),
-    })
-
-    game["valid_answers"][user_id] = 0
-    game["invalid_answers"][user_id] = 0
-    game["response_times"][user_id] = []
-    game["total_words"][user_id] = 0
-
-    return True
-
-
-def noichu_remove_player(game, user_id):
-    game["active_players"] = [
-        player
-        for player in game["active_players"]
-        if player["id"] != user_id
-    ]
-
-
-def noichu_player_exists(game, user_id):
-    return any(
-        player["id"] == user_id
-        for player in game["players"]
-    )
-
-
-def noichu_get_player(game, user_id):
-    for player in game["players"]:
-        if player["id"] == user_id:
-            return player
-
-    return None
-
-
-def noichu_player_text(player, number):
-    name = noichu_display_name(player)
-
-    return f"{number}. {name}"
-
-
-def noichu_cancel_task(chat_id):
-    task = NOICHU_TASKS.pop(
-        chat_id,
-        None
-    )
-
-    if task:
+    if owner_id:
 
         try:
-            task.cancel()
-        except Exception:
+
+            if int(owner_id) == int(
+                user_id
+            ):
+                return True
+
+        except ValueError:
             pass
 
-# ============================================================
-# 🎮 NỐI CHỮ VIỆT NAM - LOBBY + NÚT THAM GIA
-# ============================================================
+    return False
 
-async def command_noichu(message, args=None):
-    if not is_group(message):
-        await send_message(
-            message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
-        )
-        return
 
-    chat_id = message["chat"]["id"]
-
-    # Nếu nhóm đang có game
-    if chat_id in NOICHU_GAMES:
-        old_game = NOICHU_GAMES[chat_id]
-
-        if old_game.get("started"):
-            await send_message(
-                chat_id,
-                "🎮 Nhóm đang có một ván Nối Chữ đang diễn ra."
-            )
-            return
-
-        if old_game.get("players"):
-            await send_message(
-                chat_id,
-                "🎮 Nhóm đã có phòng Nối Chữ đang chờ người chơi."
-            )
-            return
-
-        noichu_cancel_task(chat_id)
-
-    game = noichu_create_game(chat_id)
-
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {
-                    "text": "🎮 THAM GIA",
-                    "callback_data": f"noichu_join:{chat_id}"
-                }
-            ]
-        ]
-    }
-
-    text = (
-        "🎮 <b>WELCOME ĐẾN VỚI NỐI CHỮ VIỆT NAM</b>\n\n"
-        "Vui lòng bấm vào nút <b>THAM GIA</b> để vào trò chơi.\n\n"
-        "👥 Tối thiểu: 2 người chơi\n"
-        "⏱ Thời gian đăng ký: 3 phút\n"
-        "🔀 Thứ tự lượt chơi sẽ được xáo ngẫu nhiên.\n\n"
-        "⚠️ Khi game bắt đầu, chỉ người đúng lượt mới được trả lời."
-    )
-
-    result = await send_message(
-        chat_id,
-        text,
-        parse_mode="HTML",
-        reply_markup=keyboard
-    )
-
-    if isinstance(result, dict):
-        sent_message = result.get("result")
-
-        if isinstance(sent_message, dict):
-            game["lobby_message_id"] = sent_message.get("message_id")
-
-    # Chờ 3 phút rồi bắt đầu game
-    task = asyncio.create_task(
-        noichu_start_after_delay(chat_id)
-    )
-
-    NOICHU_TASKS[chat_id] = task
-
-
-async def noichu_start_after_delay(chat_id):
-    try:
-        await asyncio.sleep(180)
-
-        game = noichu_get_game(chat_id)
-
-        if not game:
-            return
-
-        if game.get("started"):
-            return
-
-        if len(game.get("players", [])) < 2:
-            await send_message(
-                chat_id,
-                "❌ Nối Chữ đã hết thời gian đăng ký nhưng chưa đủ 2 người chơi.\n"
-                "Ván chơi đã bị hủy."
-            )
-
-            NOICHU_GAMES.pop(
-                chat_id,
-                None
-            )
-
-            return
-
-        await noichu_start_game(chat_id)
-
-    except asyncio.CancelledError:
-        return
-
-    except Exception as e:
-        logger.exception(
-            "NOICHU START ERROR: %s",
-            e
-        )
-
-    finally:
-        NOICHU_TASKS.pop(
-            chat_id,
-            None
-        )
-
-
-async def handle_noichu_callback(callback_query):
-    data = callback_query.get(
-        "data",
-        ""
-    )
-
-    if not data.startswith("noichu_join:"):
-        return False
-
-    try:
-        chat_id = int(
-            data.split(
-                ":",
-                1
-            )[1]
-        )
-    except Exception:
-        return True
-
-    user = callback_query.get("from")
-
-    if not user:
-        return True
-
-    game = noichu_get_game(chat_id)
-
-    if not game:
-        await api(
-            "answerCallbackQuery",
-            {
-                "callback_query_id": callback_query["id"],
-                "text": "Phòng chơi không còn tồn tại.",
-                "show_alert": True
-            }
-        )
-
-        return True
-
-    if game.get("started"):
-        await api(
-            "answerCallbackQuery",
-            {
-                "callback_query_id": callback_query["id"],
-                "text": "Ván chơi đã bắt đầu.",
-                "show_alert": True
-            }
-        )
-
-        return True
-
-    added = noichu_add_player(
-        game,
-        user
-    )
-
-    if not added:
-        await api(
-            "answerCallbackQuery",
-            {
-                "callback_query_id": callback_query["id"],
-                "text": "Bạn đã tham gia rồi.",
-                "show_alert": True
-            }
-        )
-
-        return True
-
-    await api(
-        "answerCallbackQuery",
-        {
-            "callback_query_id": callback_query["id"],
-            "text": "🎮 Tham gia thành công!"
-        }
-    )
-
-    lines = [
-        "🎮 <b>NỐI CHỮ VIỆT NAM</b>",
-        "",
-        "👥 <b>Danh sách người chơi:</b>"
-    ]
-
-    for index, player in enumerate(
-        game["players"],
-        1
-    ):
-        lines.append(
-            noichu_player_text(
-                player,
-                index
-            )
-        )
-
-    lines.extend([
-        "",
-        f"👤 Tổng người chơi: <b>{len(game['players'])}</b>",
-        "⏱ Game sẽ bắt đầu sau 3 phút kể từ khi tạo phòng.",
-        "",
-        "Bấm <b>THAM GIA</b> để vào danh sách."
-    ])
-
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {
-                    "text": "🎮 THAM GIA",
-                    "callback_data": f"noichu_join:{chat_id}"
-                }
-            ]
-        ]
-    }
-
-    message_id = game.get(
-        "lobby_message_id"
-    )
-
-    if message_id:
-
-        try:
-            await api(
-                "editMessageText",
-                {
-                    "chat_id": chat_id,
-                    "message_id": message_id,
-                    "text": "\n".join(lines),
-                    "parse_mode": "HTML",
-                    "reply_markup": keyboard
-                }
-            )
-        except Exception:
-            pass
-
-    return True
-
-# ============================================================
-# 🎮 NỐI CHỮ VIỆT NAM - BẮT ĐẦU GAME + CHIA LƯỢT
-# ============================================================
-
-async def noichu_start_game(chat_id):
-    game = noichu_get_game(chat_id)
-
-    if not game:
-        return
-
-    players = list(game.get("players", []))
-
-    if len(players) < 2:
-        await send_message(
-            chat_id,
-            "❌ Không đủ 2 người chơi để bắt đầu Nối Chữ."
-        )
-
-        NOICHU_GAMES.pop(
-            chat_id,
-            None
-        )
-
-        return
-
-    # Xáo ngẫu nhiên thứ tự ban đầu
-    random.shuffle(players)
-
-    game["active_players"] = players.copy()
-    game["turn_order"] = players.copy()
-    game["started"] = True
-    game["started_at"] = time.time()
-    game["last_phrase"] = None
-    game["last_word"] = None
-    game["rounds"] = 0
-
-    # Reset dữ liệu thống kê
-    for player in players:
-        user_id = player["id"]
-
-        game["valid_answers"][user_id] = 0
-        game["invalid_answers"][user_id] = 0
-        game["response_times"][user_id] = []
-        game["total_words"][user_id] = 0
-
-    names = []
-
-    for index, player in enumerate(players, 1):
-        names.append(
-            f"{index}. {noichu_display_name(player)}"
-        )
-
-    await send_message(
-        chat_id,
-        "🔥 <b>NỐI CHỮ VIỆT NAM CHÍNH THỨC BẮT ĐẦU!</b>\n\n"
-        "👥 Người chơi:\n"
-        + "\n".join(names)
-        + "\n\n"
-        "🔀 Thứ tự đã được xáo ngẫu nhiên.\n"
-        "⚠️ Chỉ người đúng lượt mới được trả lời.\n"
-        "💀 Nối sai sẽ bị loại.\n\n"
-        "🎯 Người cuối cùng còn lại sẽ chiến thắng!",
-        parse_mode="HTML"
-    )
-
-    await noichu_next_turn(
-        chat_id
-    )
-
-
-async def noichu_next_turn(chat_id):
-    game = noichu_get_game(chat_id)
-
-    if not game or not game.get("started"):
-        return
-
-    active_players = game.get(
-        "active_players",
-        []
-    )
-
-    # Chỉ còn 1 người → chiến thắng
-    if len(active_players) <= 1:
-
-        if len(active_players) == 1:
-            await noichu_finish(
-                chat_id,
-                active_players[0]["id"]
-            )
-
-        else:
-            await send_message(
-                chat_id,
-                "❌ Không còn người chơi. Ván Nối Chữ kết thúc."
-            )
-
-            NOICHU_GAMES.pop(
-                chat_id,
-                None
-            )
-
-        return
-
-    previous_player = game.get(
-        "current_player"
-    )
-
-    # Không chọn lại ngay người vừa chơi nếu còn người khác
-    candidates = [
-        player
-        for player in active_players
-        if player["id"] != previous_player
-    ]
-
-    if not candidates:
-        candidates = active_players
-
-    next_player = random.choice(
-        candidates
-    )
-
-    game["current_player"] = next_player["id"]
-    game["turn_started_at"] = time.time()
-
-    if game.get("last_word"):
-
-        await send_message(
-            chat_id,
-            f"🎯 Đến lượt "
-            f"<a href=\"tg://user?id={next_player['id']}\">"
-            f"{html.escape(noichu_display_name(next_player))}"
-            f"</a>\n\n"
-            f"🔗 Từ trước: <b>{html.escape(game['last_word'])}</b>\n"
-            f"👉 Câu của bạn phải bắt đầu bằng từ "
-            f"<b>{html.escape(game['last_word'])}</b>.",
-            parse_mode="HTML"
-        )
-
-    else:
-
-        await send_message(
-            chat_id,
-            f"🎯 Lượt đầu tiên thuộc về "
-            f"<a href=\"tg://user?id={next_player['id']}\">"
-            f"{html.escape(noichu_display_name(next_player))}"
-            f"</a>!\n\n"
-            f"💬 Hãy nói một cụm từ bất kỳ để bắt đầu trò chơi.",
-            parse_mode="HTML"
-        )
-
-# ============================================================
-# 🎮 NỐI CHỮ VIỆT NAM - XỬ LÝ CÂU TRẢ LỜI
-# ============================================================
-
-async def noichu_handle_text(message):
-    chat = message.get("chat", {})
-    user = message.get("from", {})
-    text = message.get("text", "")
-
-    if chat.get("type") not in ("group", "supergroup"):
-        return False
-
-    if not text or text.startswith("/"):
-        return False
-
-    chat_id = chat.get("id")
-    user_id = user.get("id")
-
-    game = noichu_get_game(chat_id)
-
-    if not game or not game.get("started"):
-        return False
-
-    active_players = game.get("active_players", [])
-
-    # Người không tham gia game nói chuyện
-    if not any(p["id"] == user_id for p in active_players):
-        return False
-
-    # Chưa đến lượt
-    if game.get("current_player") != user_id:
-        await send_message(
-            chat_id,
-            "mày chưa đến lượt bớt tài lanh đi"
-        )
-        return True
-
-    phrase = noichu_normalize(text)
-
-    if not phrase:
-        return True
-
-    first_word = noichu_first_word(phrase)
-    last_word = noichu_last_word(phrase)
-
-    # Kiểm tra nối chữ
-    if game.get("last_word"):
-        required_word = noichu_normalize(
-            game["last_word"]
-        )
-
-        if first_word != required_word:
-            game["invalid_answers"][user_id] = (
-                game["invalid_answers"].get(user_id, 0) + 1
-            )
-
-            player = noichu_get_player(
-                game,
-                user_id
-            )
-
-            name = (
-                noichu_display_name(player)
-                if player
-                else "Người chơi"
-            )
-
-            await send_message(
-                chat_id,
-                f"❌ {name} đã nối sai!\n"
-                f"🔗 Phải bắt đầu bằng: "
-                f"<b>{html.escape(required_word)}</b>\n"
-                f"💀 {name} đã bị loại khỏi trò chơi.",
-                parse_mode="HTML"
-            )
-
-            noichu_remove_player(
-                game,
-                user_id
-            )
-
-            game["current_player"] = None
-
-            await noichu_next_turn(
-                chat_id
-            )
-
-            return True
-
-    # Câu hợp lệ
-    started = game.get(
-        "turn_started_at"
-    ) or time.time()
-
-    response_time = max(
-        0.1,
-        time.time() - started
-    )
-
-    game["valid_answers"][user_id] = (
-        game["valid_answers"].get(user_id, 0) + 1
-    )
-
-    game["response_times"].setdefault(
-        user_id,
-        []
-    ).append(
-        response_time
-    )
-
-    game["total_words"][user_id] = (
-        game["total_words"].get(user_id, 0)
-        + len(phrase.split())
-    )
-
-    game["rounds"] = (
-        game.get("rounds", 0) + 1
-    )
-
-    game["last_phrase"] = phrase
-    game["last_word"] = last_word
-    game["current_player"] = None
-
-    await send_message(
-        chat_id,
-        f"✅ <b>Nối đúng!</b>\n"
-        f"💬 {html.escape(phrase)}\n"
-        f"🔗 Từ tiếp theo phải bắt đầu bằng: "
-        f"<b>{html.escape(last_word)}</b>",
-        parse_mode="HTML"
-    )
-
-    await noichu_next_turn(
-        chat_id
-    )
-
-    return True
-
-# ============================================================
-# 🎮 NỐI CHỮ VIỆT NAM - KẾT THÚC GAME + TÍNH HIỆU SUẤT
-# ============================================================
-
-async def noichu_finish(chat_id, winner_id):
-    game = noichu_get_game(chat_id)
-
-    if not game:
-        return
-
-    winner = noichu_get_player(
-        game,
-        winner_id
-    )
-
-    if not winner:
-        NOICHU_GAMES.pop(
-            chat_id,
-            None
-        )
-        return
-
-    valid = game["valid_answers"].get(
-        winner_id,
-        0
-    )
-
-    times = game["response_times"].get(
-        winner_id,
-        []
-    )
-
-    total_words = game["total_words"].get(
-        winner_id,
-        0
-    )
-
-    # Điểm tốc độ
-    if times:
-        average_time = sum(times) / len(times)
-
-        speed_score = max(
-            0,
-            min(
-                1,
-                (8 - average_time) / 8
-            )
-        )
-    else:
-        average_time = 8
-        speed_score = 0
-
-    # Điểm chất lượng câu
-    if valid > 0:
-        average_words = total_words / valid
-
-        quality_score = max(
-            0,
-            min(
-                1,
-                (average_words - 1) / 4
-            )
-        )
-    else:
-        quality_score = 0
-
-    # Hiệu suất:
-    # 50 điểm nền
-    # 30 điểm tốc độ
-    # 20 điểm chất lượng câu
-    performance = round(
-        50
-        + speed_score * 30
-        + quality_score * 20
-    )
-
-    performance = max(
-        50,
-        min(
-            100,
-            performance
-        )
-    )
-
-    name = noichu_display_name(
-        winner
-    )
-
-    await send_message(
-        chat_id,
-        (
-            "🏆 <b>GAME NỐI CHỮ ĐÃ KẾT THÚC!</b>\n\n"
-            f"👑 Người chiến thắng: <b>{html.escape(name)}</b>\n"
-            f"🔥 Hiệu suất: <b>{performance}%</b>\n"
-            f"✅ Số câu nối đúng: <b>{valid}</b>\n"
-            f"⚡ Thời gian trung bình: <b>{average_time:.2f}s</b>\n\n"
-            "🎉 Chúc mừng nhà vô địch!"
-        ),
-        parse_mode="HTML"
-    )
-
-    # Xóa game sau khi kết thúc
-    NOICHU_GAMES.pop(
-        chat_id,
-        None
-    )
-
-    noichu_cancel_task(
-        chat_id
-    )
-
-# ============================================================
-# START MENU - NGỌC MỸ
-# ============================================================
-
-def start_main_keyboard():
-    return {
-        "inline_keyboard": [
-            [
-                {
-                    "text": "👑 Quản trị",
-                    "callback_data": "start_admin"
-                }
-            ],
-            [
-                {
-                    "text": "🧰 Tiện ích khác",
-                    "callback_data": "start_utils"
-                }
-            ],
-            [
-                {
-                    "text": "🤖 Ngọc Mỹ AI",
-                    "callback_data": "start_ai"
-                }
-            ],
-        ]
-    }
-
-
-def start_back_keyboard():
-    return {
-        "inline_keyboard": [
-            [
-                {
-                    "text": "🔙 Quay lại",
-                    "callback_data": "start_home"
-                }
-            ]
-        ]
-    }
-
-
-def start_admin_text():
-    return (
-        "👑 <b>QUẢN TRỊ NHÓM</b>\n\n"
-
-        "⚠️ <b>/warn</b> — Cảnh cáo thành viên.\n"
-        "Cách dùng: <code>/warn @username [lý do]</code> hoặc reply.\n\n"
-
-        "📋 <b>/warns</b> — Xem cảnh cáo.\n"
-        "Cách dùng: <code>/warns @username</code> hoặc reply.\n\n"
-
-        "🔇 <b>/mute</b> — Khóa thành viên chat.\n"
-        "Cách dùng: <code>/mute @username 10m</code> hoặc reply.\n\n"
-
-        "🔊 <b>/unmute</b> — Mở khóa thành viên.\n"
-        "Cách dùng: <code>/unmute @username</code> hoặc reply.\n\n"
-
-        "🚪 <b>/kick</b> — Đá thành viên.\n"
-        "Cách dùng: <code>/kick @username</code> hoặc reply.\n\n"
-
-        "🚫 <b>/ban</b> — Cấm thành viên.\n"
-        "Cách dùng: <code>/ban @username</code> hoặc reply.\n\n"
-
-        "♻️ <b>/unban</b> — Gỡ cấm thành viên.\n"
-        "Cách dùng: <code>/unban @username</code> hoặc reply.\n\n"
-
-        "🗑 <b>/purge</b> — Xóa nhiều tin nhắn.\n"
-        "Cách dùng: <code>/purge 10</code>.\n\n"
-
-        "📌 <b>/pin</b> — Ghim tin nhắn.\n"
-        "Cách dùng: reply tin nhắn rồi dùng <code>/pin</code>.\n\n"
-
-        "📍 <b>/unpin</b> — Bỏ ghim.\n"
-        "Cách dùng: <code>/unpin</code>.\n\n"
-
-        "🔒 <b>/lock</b> — Khóa nhóm.\n"
-        "Cách dùng: <code>/lock</code>.\n\n"
-
-        "🔓 <b>/unlock</b> — Mở khóa nhóm.\n"
-        "Cách dùng: <code>/unlock</code>.\n\n"
-
-        "🛡 <b>BẢO VỆ NHÓM</b>\n"
-        "<code>/antispam on|off</code> — Chống spam.\n"
-        "<code>/antilink on|off</code> — Chống link.\n"
-        "<code>/antibuff on|off</code> — Chống buff thành viên.\n"
-        "<code>/antifake on|off</code> — Chống giả mạo."
-    )
-
-
-def start_utils_text():
-    return (
-        "🧰 <b>TIỆN ÍCH KHÁC</b>\n\n"
-
-        "⭐ <b>LEVEL</b>\n"
-        "<code>/level</code> — Xem hệ thống level.\n"
-        "<code>/levelyou</code> — Xem level của bạn.\n"
-        "<code>/levelbxh</code> — Xem bảng xếp hạng.\n"
-        "<code>/leveldanhsach</code> — Xem điều kiện lên level.\n"
-        "<code>/levelnhiemvu</code> — Xem nhiệm vụ tiếp theo.\n\n"
-
-        "🎮 <b>GAME NỐI CHỮ</b>\n"
-        "<code>/noichu</code> — Mở game Nối Chữ Việt Nam.\n"
-        "Cách dùng: dùng <code>/noichu</code> trong nhóm rồi bấm "
-        "<b>THAM GIA</b>.\n"
-        "Bot không cần là admin.\n\n"
-
-        "🔥 <b>ĐIỂM DANH</b>\n"
-        "<code>/diemdanh</code> — Điểm danh hằng ngày.\n\n"
-
-        "❤️ <b>THƠ</b>\n"
-        "<code>/thotinh</code> — Random thơ tình.\n"
-        "<code>/thodoi</code> — Random thơ đời.\n\n"
-
-        "💤 <b>AFK</b>\n"
-        "<code>/afk [lý do]</code> — Bật trạng thái AFK.\n\n"
-
-        "🔎 <b>FILTER</b>\n"
-        "<code>/filter từ khóa | nội dung</code> — Tạo phản hồi tự động.\n"
-        "<code>/filters</code> — Xem filter.\n"
-        "<code>/stopfilter từ khóa</code> — Xóa filter.\n\n"
-
-        "🛠 <b>TIỆN ÍCH</b>\n"
-        "<code>/id</code> — Xem ID.\n"
-        "<code>/info</code> — Xem thông tin.\n"
-        "<code>/ping</code> — Kiểm tra bot.\n"
-        "<code>/time</code> — Xem thời gian.\n"
-        "<code>/stats</code> — Xem thống kê.\n"
-        "<code>/echo nội dung</code> — Bot lặp lại nội dung.\n"
-        "<code>/calc phép_tính</code> — Tính toán.\n"
-        "<code>/search từ khóa</code> — Tìm kiếm.\n"
-        "<code>/weather địa điểm</code> — Xem thời tiết.\n"
-        "<code>/short link</code> — Rút gọn liên kết."
-    )
-
-
-async def send_start_menu(message):
-
-    user = from_user(message) or {}
-
-    username = user.get("username")
-
-    if username:
-        greeting = "@" + html.escape(username)
-    else:
-        greeting = html.escape(
-            user.get("first_name", "bạn")
-        )
-
-    text = (
-        f"👋 <b>Chào {greeting}, tôi là Ngọc Mỹ.</b>\n\n"
-        "Tôi có nhiều công cụ hữu ích. "
-        "Chạm vào một module bên dưới để xem lệnh.\n\n"
-        "Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸"
-    )
-
-    await api(
-        "sendMessage",
-        {
-            "chat_id": chat_id(message),
-            "text": text,
-            "parse_mode": "HTML",
-            "reply_markup": json.dumps(
-                start_main_keyboard()
-            )
-        }
-    )
-
-
-async def handle_start_menu_callback(callback):
-
-    data = callback.get("data")
-    message = callback.get("message") or {}
-    callback_id = callback.get("id")
-
-    if data == "start_home":
-
-        text = (
-            "🏠 <b>Chào mừng trở lại với Ngọc Mỹ.</b>\n\n"
-            "Tôi có nhiều công cụ hữu ích. "
-            "Chạm vào một module bên dưới để xem lệnh.\n\n"
-            "Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸"
-        )
-
-        keyboard = start_main_keyboard()
-
-    elif data == "start_admin":
-
-        text = start_admin_text()
-        keyboard = start_back_keyboard()
-
-    elif data == "start_utils":
-
-        text = start_utils_text()
-        keyboard = start_back_keyboard()
-
-    else:
-
-        return False
-
-    await api(
-        "editMessageText",
-        {
-            "chat_id": message.get(
-                "chat",
-                {}
-            ).get("id"),
-
-            "message_id":
-                message.get("message_id"),
-
-            "text": text,
-
-            "parse_mode": "HTML",
-
-            "reply_markup":
-                json.dumps(keyboard)
-        }
-    )
-
-    await answer_callback(
-        callback_id,
-        ""
-    )
-
-    return True
-
-async def command_start(
+async def require_group(
     message
 ):
 
-    user = from_user(
-        message
-    )
+    if not is_group(message):
 
-    if user:
-        await save_user(
-            user
+        await send_message(
+            get_chat_id(message),
+            PRIVATE_GROUP_MESSAGE,
+            get_message_id(message)
         )
 
-    await send_start_menu(
+        return False
+
+    return True
+
+
+async def require_admin(
+    message
+):
+
+    if not await require_group(
+        message
+    ):
+        return False
+
+    user_id = get_user_id(
         message
     )
 
+    if await is_owner(
+        user_id
+    ):
+        return True
+
+    if not await is_admin(
+        get_chat_id(message),
+        user_id
+    ):
+
+        await send_message(
+            get_chat_id(message),
+            ADMIN_ONLY_MESSAGE,
+            get_message_id(message)
+        )
+
+        return False
+
+    return True
+
+
+# ============================================================
+# BOT PERMISSIONS
+# ============================================================
+
+async def get_me():
+
+    result = await api(
+        "getMe"
+    )
+
+    if not result.get("ok"):
+        return {}
+
+    return result.get(
+        "result",
+        {}
+    )
+
+
+async def get_bot_id():
+
+    me = await get_me()
+
+    return me.get(
+        "id"
+    )
+
+
+async def can_delete_messages(
+    chat_id
+):
+
+    bot_id = await get_bot_id()
+
+    if not bot_id:
+        return False
+
+    member = await get_chat_member(
+        chat_id,
+        bot_id
+    )
+
+    if not member:
+        return False
+
+    if member.get(
+        "status"
+    ) == "creator":
+        return True
+
+    if member.get(
+        "status"
+    ) != "administrator":
+        return False
+
+    return bool(
+        member.get(
+            "can_delete_messages",
+            False
+        )
+    )
+
+
+async def can_restrict_members(
+    chat_id
+):
+
+    bot_id = await get_bot_id()
+
+    if not bot_id:
+        return False
+
+    member = await get_chat_member(
+        chat_id,
+        bot_id
+    )
+
+    if not member:
+        return False
+
+    if member.get(
+        "status"
+    ) == "creator":
+        return True
+
+    return (
+        member.get("status")
+        == "administrator"
+        and member.get(
+            "can_restrict_members",
+            False
+        )
+    )
+
+
+# ============================================================
+# SETTINGS
+# ============================================================
+
+async def get_setting(
+    chat_id,
+    key,
+    default=None
+):
+
+    row = await adb_execute(
+        """
+        SELECT value
+        FROM settings
+        WHERE chat_id = ?
+        AND key = ?
+        """,
+        (
+            chat_id,
+            key
+        ),
+        fetchone=True
+    )
+
+    if not row:
+        return default
+
+    return row["value"]
+
+
+async def set_setting(
+    chat_id,
+    key,
+    value
+):
+
+    await adb_execute(
+        """
+        INSERT INTO settings(
+            chat_id,
+            key,
+            value
+        )
+        VALUES (?, ?, ?)
+
+        ON CONFLICT(chat_id, key)
+        DO UPDATE SET
+            value =
+                excluded.value
+        """,
+        (
+            chat_id,
+            key,
+            str(value)
+        )
+    )
+
+
+async def setting_enabled(
+    chat_id,
+    key,
+    default=False
+):
+
+    value = await get_setting(
+        chat_id,
+        key,
+        "1" if default else "0"
+    )
+
+    return str(value).lower() in {
+        "1",
+        "true",
+        "yes",
+        "on"
+    }
+
+
+# ============================================================
+# HELP TEXT
+# ============================================================
+
+HELP_TEXT = """
+<b>🌸 NGỌC MỸ — TRỢ GIÚP</b>
+
+<b>👮 QUẢN TRỊ NHÓM</b>
+
+/ban — Ban thành viên
+/unban — Gỡ ban
+/mute — Tắt chat thành viên
+/unmute — Gỡ mute
+/warn — Cảnh cáo thành viên
+/unwarn — Xóa cảnh cáo
+/kick — Đuổi thành viên
+/promote — Thăng quản trị
+/demote — Hạ quản trị
+/pin — Ghim tin nhắn
+/unpin — Bỏ ghim
+
+<b>🛡️ BẢO VỆ</b>
+
+/antispam — Chống spam
+/antilink — Chống link
+/antibuff — Chống buff thành viên
+/antifake — Chống tài khoản giả mạo
+
+<b>🔧 TIỆN ÍCH</b>
+
+/afk — Bật trạng thái AFK
+/filter — Tạo bộ lọc
+/filters — Xem bộ lọc
+/stopfilter — Xóa bộ lọc
+/diemdanh — Điểm danh hằng ngày
+
+<b>🎮 TRÒ CHƠI</b>
+
+/noichu — Nối chữ Việt Nam
+
+<b>📈 LEVEL</b>
+
+/level — Xem hệ thống level
+/levelyou — Xem level của bạn
+/levelbxh — Bảng xếp hạng level
+/leveldanhsach — Điều kiện lên level
+/levelnhiemvu — Nhiệm vụ level
+
+<b>❤️ THƠ</b>
+
+/thodoi — Thơ đời
+/thotinh — Thơ tình
+
+<b>ℹ️ KHÁC</b>
+
+/help — Hiển thị trợ giúp
+/start — Mở menu Ngọc Mỹ
+
+━━━━━━━━━━━━━━
+👑 Owner: @DTN_207
+"""
+
+
+# ============================================================
+# START MENU
+# ============================================================
+
+START_TEXT = """
+<b>🌸 Xin chào, mình là Ngọc Mỹ!</b>
+
+Bot quản lý nhóm, tiện ích,
+level, điểm danh, trò chơi
+và nhiều chức năng khác.
+
+<b>Hãy chọn chức năng bên dưới.</b>
+"""
+
+
+def start_keyboard():
+
+    return json.dumps(
+        {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "📖 Hướng dẫn",
+                        "callback_data": "help"
+                    }
+                ],
+                [
+                    {
+                        "text": "🛠 Quản trị",
+                        "callback_data":
+                            "admin_menu"
+                    },
+                    {
+                        "text": "🛡 Bảo vệ",
+                        "callback_data":
+                            "protect_menu"
+                    }
+                ],
+                [
+                    {
+                        "text": "🎮 Trò chơi",
+                        "callback_data":
+                            "game_menu"
+                    },
+                    {
+                        "text": "📈 Level",
+                        "callback_data":
+                            "level_menu"
+                    }
+                ],
+                [
+                    {
+                        "text": "❤️ Thơ",
+                        "callback_data":
+                            "poem_menu"
+                    }
+                ]
+            ]
+        },
+        ensure_ascii=False
+    )
+
+
+async def send_start_menu(
     message
+):
 
-    message
+    chat_id = get_chat_id(
+        message
+    )
 
-HELP_TEXT = (
-    "🤖 NGỌC MỸ — DANH SÁCH LỆNH\n\n"
+    return await api(
+        "sendMessage",
+        {
+            "chat_id": chat_id,
+            "text": START_TEXT,
+            "parse_mode": "HTML",
+            "reply_markup":
+                start_keyboard()
+        }
+    )
 
-    "👤 LỆNH CƠ BẢN\n"
-    "/start → Khởi động bot\n"
-    "/help → Xem hướng dẫn sử dụng\n"
-    "/id → Xem ID Telegram\n"
-    "/info → Xem thông tin tài khoản\n"
-    "/ping → Kiểm tra bot\n"
-    "/time → Xem thời gian\n"
-    "/stats → Xem thống kê bot\n"
-    "/settings → Xem cài đặt nhóm\n\n"
 
-    "🛠 TIỆN ÍCH\n"
-    "/echo → Bot lặp lại nội dung\n"
-    "/calc → Tính phép tính\n"
-    "/search → Tìm kiếm thông tin\n"
-    "/weather → Xem thời tiết\n"
-    "/short → Rút gọn liên kết\n\n"
-
-    "🛡 QUẢN LÝ NHÓM\n"
-    "/warn → Cảnh cáo thành viên\n"
-    "/warns → Xem cảnh cáo\n"
-    "/mute → Khóa chat thành viên\n"
-    "/unmute → Mở khóa chat\n"
-    "/kick → Đá thành viên\n"
-    "/ban → Cấm thành viên\n"
-    "/unban → Gỡ cấm thành viên\n"
-    "/purge → Xóa nhiều tin nhắn\n"
-    "/pin → Ghim tin nhắn\n"
-    "/unpin → Bỏ ghim\n"
-    "/lock → Khóa chat\n"
-    "/unlock → Mở khóa chat\n\n"
-
-    "👑 QUẢN TRỊ BOT\n"
-    "/admins → Xem quản trị viên\n"
-    "/broadcast → Gửi thông báo\n"
-    "/users → Xem người dùng\n"
-    "/banuser → Cấm người dùng bot\n"
-    "/unbanuser → Gỡ cấm người dùng bot\n"
-    "/restart → Khởi động lại bot\n"
-    "/logs → Xem log\n\n"
-
-    "⚙️ HỆ THỐNG\n"
-    "/database → Kiểm tra database\n"
-    "/health → Kiểm tra tình trạng bot\n"
-    "/version → Xem phiên bản\n\n"
-
-    "🛡 BẢO VỆ\n"
-    "/antispam on|off → Chống spam\n"
-    "/antilink on|off → Chống link\n"
-    "/antibuff on|off → Chống buff\n"
-    "/antifake on|off → Chống giả mạo\n\n"
-
-    "💤 AFK\n"
-    "/afk [lý do] → Bật trạng thái AFK\n\n"
-
-    "🔎 FILTER\n"
-    "/filter → Tạo filter tự động trả lời\n"
-    "/filters → Xem các filter\n"
-    "/stopfilter → Xóa filter\n\n"
-
-    "❤️ THƠ\n"
-    "/thodoi → Random thơ đời\n"
-    "/thotinh → Random thơ tình\n\n"
-
-    "🔥 ĐIỂM DANH\n"
-    "/diemdanh → Điểm danh hằng ngày\n\n"
-
-    "⭐ LEVEL\n"
-    "/level → Hệ thống level\n"
-    "/levelyou → Xem level hiện tại\n"
-    "/levelbxh → Xem bảng xếp hạng level\n"
-    "/leveldanhsach → Xem điều kiện lên level\n"
-    "/levelnhiemvu → Xem nhiệm vụ tiếp theo\n\n"
-
-    "🎮 TRÒ CHƠI — NỐI CHỮ VIỆT NAM\n"
-    "/noichu → Mở trò chơi Nối Chữ\n"
-    "→ Bấm THAM GIA để vào game\n"
-    "→ Cần ít nhất 2 người chơi\n"
-    "→ Game bắt đầu sau 3 phút\n"
-    "→ Nối sai sẽ bị loại\n"
-    "→ Người cuối cùng còn lại thắng\n\n"
-
-    "👑 Owner: @DTN_207"
-)
+# ============================================================
+# HELP COMMAND
+# ============================================================
 
 async def command_help(
     message
 ):
 
+    # /help trong nhóm
     if is_group(message):
 
         await send_message(
-            chat_id(message),
-            (
-                "Help Cái Đầu Buồi "
-                "Chủ Tao Chưa Ra "
-                "Help Group OK"
-            )
+            get_chat_id(message),
+            "❌ /help chỉ sử dụng trong tin nhắn riêng với bot.",
+            get_message_id(message)
         )
 
         return
 
     await send_message(
-        chat_id(message),
-        HELP_TEXT
+        get_chat_id(message),
+        HELP_TEXT,
+        get_message_id(message)
     )
 
+
+async def command_start(
+    message
+):
+
+    await send_start_menu(
+        message
+    )
+
+
+# ============================================================
+# OWNER / BASIC COMMANDS
+# ============================================================
 
 async def command_id(
     message
 ):
 
-    user = (
-        message.get(
-            "reply_to_message",
-            {}
-        ).get("from")
-        or from_user(message)
-    )
-
-    if not user:
-
-        return
-
-    username = (
-        "@"
-        + html.escape(
-            user["username"]
-        )
-        if user.get("username")
-        else "Không có"
-    )
-
-    await send_message(
-        chat_id(message),
-        (
-            "🆔 <b>TELEGRAM ID</b>\n\n"
-            f"👤 Tên: "
-            f"{html.escape(user_full_name(user))}\n"
-            f"🆔 ID: "
-            f"<code>{user.get('id')}</code>\n"
-            f"🔗 Username: "
-            f"{username}"
-        )
-    )
-
-
-async def command_info(
-    message
-):
-
-    user = from_user(
+    user = get_user(
         message
     )
 
     if not user:
-
         return
 
-    username = (
-        "@"
-        + html.escape(
-            user["username"]
-        )
-        if user.get("username")
-        else "Không có"
+    text = (
+        f"🆔 <b>User ID:</b> "
+        f"<code>{user.get('id')}</code>\n"
+        f"👤 <b>Tên:</b> "
+        f"{html.escape(user_full_name(user))}"
     )
 
-    language = (
-        user.get(
-            "language_code"
+    if user.get("username"):
+
+        text += (
+            "\n🔗 <b>Username:</b> "
+            f"@{html.escape(user['username'])}"
         )
-        or "Không xác định"
-    )
 
     await send_message(
-        chat_id(message),
-        (
-            "👤 <b>THÔNG TIN TÀI KHOẢN</b>\n\n"
-            f"📛 Tên: "
-            f"{html.escape(user_full_name(user))}\n"
-            f"🆔 ID: "
-            f"<code>{user.get('id')}</code>\n"
-            f"🔗 Username: "
-            f"{username}\n"
-            f"🌐 Ngôn ngữ: "
-            f"{html.escape(language)}\n"
-            f"🤖 Bot: "
-            f"{'Có' if user.get('is_bot') else 'Không'}"
-        )
+        get_chat_id(message),
+        text,
+        get_message_id(message)
     )
 
 
@@ -2798,3575 +1344,95 @@ async def command_ping(
     message
 ):
 
-    start = time.perf_counter()
+    started = time.perf_counter()
 
     result = await send_message(
-        chat_id(message),
-        "🏓 <b>Pong!</b>\n"
-        "⏳ Đang kiểm tra..."
+        get_chat_id(message),
+        "🏓 Đang kiểm tra...",
+        get_message_id(message)
     )
 
     elapsed = (
         time.perf_counter()
-        - start
+        - started
     ) * 1000
 
-    sent = (
-        result.get("result")
-        if result.get("ok")
-        else None
-    )
+    if result.get("ok"):
 
-    if sent:
+        sent = result[
+            "result"
+        ]
 
         await edit_message(
-            chat_id(message),
-            sent.get(
-                "message_id"
-            ),
+            get_chat_id(message),
+            sent["message_id"],
             (
-                "🏓 <b>Pong!</b>\n\n"
-                f"⚡ Response: "
-                f"<code>{elapsed:.2f} ms</code>\n"
-                f"🟢 Status: Online"
+                "🏓 <b>Pong!</b>\n"
+                f"⚡ {elapsed:.0f} ms"
             )
         )
-
-
-async def command_time(
-    message
-):
-
-    now = datetime.now()
-
-    await send_message(
-        chat_id(message),
-        (
-            "🕐 <b>THỜI GIAN HIỆN TẠI</b>\n\n"
-            f"📅 Ngày: "
-            f"<code>"
-            f"{now.strftime('%d/%m/%Y')}"
-            f"</code>\n"
-            f"⏰ Giờ: "
-            f"<code>"
-            f"{now.strftime('%H:%M:%S')}"
-            f"</code>"
-        )
-    )
 
 
 async def command_stats(
     message
 ):
 
-    users = await adb_execute(
-        "SELECT COUNT(*) AS c FROM users",
-        fetchone=True
-    )
-
-    warns = await adb_execute(
-        "SELECT COUNT(*) AS c FROM warns",
-        fetchone=True
-    )
-
-    filters = await adb_execute(
-        "SELECT COUNT(*) AS c FROM filters",
-        fetchone=True
-    )
-
-    checkins = await adb_execute(
-        "SELECT COUNT(*) AS c FROM checkins",
-        fetchone=True
-    )
-
-    await send_message(
-        chat_id(message),
-        (
-            "📊 <b>BOT STATISTICS</b>\n\n"
-            f"👥 Users: "
-            f"<code>{users['c']}</code>\n"
-            f"⚠️ Warns: "
-            f"<code>{warns['c']}</code>\n"
-            f"🔎 Filters: "
-            f"<code>{filters['c']}</code>\n"
-            f"🔥 Check-ins: "
-            f"<code>{checkins['c']}</code>\n"
-            f"📨 Runtime messages: "
-            f"<code>"
-            f"{RUNTIME_STATS['messages']}"
-            f"</code>\n"
-            f"🛡 Protection actions: "
-            f"<code>"
-            f"{RUNTIME_STATS['deleted']}"
-            f"</code>\n"
-            f"⏱ Uptime: "
-            f"<code>{get_uptime()}</code>\n"
-            f"📦 Version: "
-            f"<code>{VERSION}</code>"
-        )
-    )
-
-
-async def command_settings(
-    message
-):
-
-    if not await require_admin(
-        message
-    ):
-
-        return
-
-    chat = chat_id(
-        message
-    )
-
-    antispam = await get_setting(
-        chat,
-        "antispam"
-    )
-
-    antilink = await get_setting(
-        chat,
-        "antilink"
-    )
-
-    antibuff = await get_setting(
-        chat,
-        "antibuff"
-    )
-
-    antifake = await get_setting(
-        chat,
-        "antifake"
-    )
-
-    def status(value):
-
-        return (
-            "🟢 ON"
-            if value
-            else "🔴 OFF"
-        )
-
-    await send_message(
-        chat,
-        (
-            "⚙️ <b>GROUP SETTINGS</b>\n\n"
-            f"🚫 AntiSpam: "
-            f"{status(antispam)}\n"
-            f"🔗 AntiLink: "
-            f"{status(antilink)}\n"
-            f"👥 AntiBuff: "
-            f"{status(antibuff)}\n"
-            f"🎭 AntiFake: "
-            f"{status(antifake)}\n\n"
-            f"💡 Dùng:\n"
-            f"<code>/antispam on|off</code>\n"
-            f"<code>/antilink on|off</code>\n"
-            f"<code>/antibuff on|off</code>\n"
-            f"<code>/antifake on|off</code>"
-        )
-    )
-
-
-# ============================================================
-# COMMAND TABLE
-# ============================================================
-
-COMMAND_HANDLERS = {
-
-    "start":
-        command_start,
-
-    "help":
-        command_help,
-
-    "id":
-        command_id,
-
-    "info":
-        command_info,
-
-    "ping":
-        command_ping,
-
-    "time":
-        command_time,
-
-    "stats":
-        command_stats,
-
-    "settings":
-        command_settings,
-
-    "level": command_level,
-    "levelyou": command_levelyou,
-    "levelbxh": command_levelbxh,
-    "leveldanhsach": command_leveldanhsach,
-    "levelnhiemvu": command_levelnhiemvu,
-    "noichu": command_noichu,
-}
-
-
-# ============================================================
-# COMMAND DISPATCHER
-# ============================================================
-
-async def dispatch_command(
-    message
-):
-
-    command, args = parse_command(
-        message
-    )
-
-    if not command:
-
-        return False
-
-    handler = COMMAND_HANDLERS.get(
-        command
-    )
-
-    if not handler:
-
-        return False
-
-    await handler(
-        message
-    )
-
-    return True
-
-
-# ============================================================
-# UPDATE PROCESSING
-# ============================================================
-
-async def noichu_handle_text(message):
-    """
-    Xử lý tin nhắn trong game Nối Chữ.
-    Trả về True nếu tin nhắn thuộc game, False nếu không.
-    """
-    chat = message.get("chat", {})
-    if chat.get("type") not in ("group", "supergroup"):
-        return False
-
-    chat_id = chat["id"]
-    game = NOICHU_GAMES.get(chat_id)
-
-    if not game or game.get("status") != "playing":
-        return False
-
-    user = message.get("from", {})
-    user_id = user.get("id")
-    text = (message.get("text") or "").strip()
-
-    if not text or not user_id:
-        return False
-
-    # Chỉ người đã tham gia game mới được tính là người chơi
-    player_ids = game.get("players", [])
-
-    if user_id not in player_ids:
-        return False
-
-    # Chưa đến lượt
-    if game.get("current_player") != user_id:
-        await send_message(
-            chat_id,
-            "mày chưa đến lượt bớt tài lanh đi"
-        )
-        return True
-
-    # Chuẩn hóa câu người chơi nhập
-    phrase = noichu_norm(text)
-
-    if not phrase:
-        return True
-
-    # Không cho nhập quá dài
-    if len(phrase) > 100:
-        await send_message(
-            chat_id,
-            "Câu quá dài, tối đa 100 ký tự."
-        )
-        return True
-
-    previous_phrase = game.get("last_phrase", "")
-
-    # Nếu đây không phải lượt đầu tiên:
-    # từ đầu câu mới phải nối được với từ cuối câu trước
-    if previous_phrase:
-        required_word = noichu_last_word(previous_phrase)
-        first_word = noichu_first_word(phrase)
-
-        if not required_word or not first_word or first_word != required_word:
-            # Người chơi nói sai -> bị loại
-            game.setdefault("eliminated", set()).add(user_id)
-
-            if user_id in game["players"]:
-                game["players"].remove(user_id)
-
-            name = noichu_name(user)
-
-            await send_message(
-                chat_id,
-                f"❌ {name} đã nối sai và bị loại khỏi trò chơi!"
-            )
-
-            # Nếu chỉ còn 1 người
-            if len(game["players"]) <= 1:
-                await noichu_finish(chat_id)
-                return True
-
-            # Chuyển lượt
-            game["last_phrase"] = previous_phrase
-            game["last_player"] = None
-
-            await noichu_next_turn(chat_id)
-            return True
-
-    # ===== NỐI ĐÚNG =====
-
-    now = time.time()
-
-    turn_started = game.get("turn_started_at", now)
-    response_time = max(0.1, now - turn_started)
-
-    # Ghi thống kê
-    stats = game.setdefault(
-        "stats",
-        {}
-    )
-
-    user_stats = stats.setdefault(
-        user_id,
-        {
-            "valid": 0,
-            "invalid": 0,
-            "total_time": 0.0,
-            "best_time": None,
-            "total_length": 0
-        }
-    )
-
-    user_stats["valid"] += 1
-    user_stats["total_time"] += response_time
-    user_stats["total_length"] += len(phrase.split())
-
-    if (
-        user_stats["best_time"] is None
-        or response_time < user_stats["best_time"]
-    ):
-        user_stats["best_time"] = response_time
-
-    # Lưu câu vừa nói
-    game["last_phrase"] = phrase
-    game["last_player"] = user_id
-
-    # Lưu thời gian để tính lượt tiếp theo
-    game["last_response_time"] = response_time
-
-    # Thông báo câu hợp lệ
-    await send_message(
-        chat_id,
-        f"✅ {noichu_name(user)}: {phrase}"
-    )
-
-    # Chuyển lượt tiếp theo
-    await noichu_next_turn(chat_id)
-
-    return True
-
-# ============================================================
-# OPENAI AI
-# ============================================================
-async def command_ai(message):
-    chat_id = message.get("chat", {}).get("id")
-    text = message.get("text", "") or ""
-
-    parts = text.split(maxsplit=1)
-
-    if len(parts) < 2:
-        await send_message(
-            chat_id,
-            "🤖 Ngọc Mỹ AI\n\n"
-            "Dùng:\n"
-            "/ai <câu hỏi>\n\n"
-            "Ví dụ:\n"
-            "/ai Trái Đất có bao nhiêu đại dương?"
-        )
-        return
-
-    question = parts[1].strip()
-
-    if len(question) > 10000:
-        await send_message(
-            chat_id,
-            "❌ Câu hỏi quá dài. Tối đa 10.000 ký tự."
-        )
-        return
-
-    await send_message(
-        chat_id,
-        "🤖 Đang suy nghĩ..."
-    )
-
-    answer = await asyncio.to_thread(
-        openai_ai_request,
-        question
-    )
-
-    if len(answer) <= 4000:
-        await send_message(
-            chat_id,
-            "🤖 Ngọc Mỹ AI:\n\n" + answer
-        )
-        return
-
-    for i in range(0, len(answer), 4000):
-        await send_message(
-            chat_id,
-            answer[i:i + 4000]
-        )
-
-# ============================================================
-# OPENAI AI
-# ============================================================
-
-def openai_ai_request(question):
-    if not OPENAI_API_KEY:
-        return "❌ AI chưa được cấu hình API Key."
-
-    url = "https://api.openai.com/v1/responses"
-
-    payload = {
-        "model": OPENAI_MODEL,
-        "instructions": AI_SYSTEM_PROMPT,
-        "input": question,
-        "max_output_tokens": 2000
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-
-    request = urllib.request.Request(
-        url,
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + OPENAI_API_KEY
-        },
-        method="POST"
-    )
-
-    try:
-        with urllib.request.urlopen(request, timeout=90) as response:
-            result = json.loads(
-                response.read().decode("utf-8")
-            )
-
-        if result.get("output_text"):
-            return result["output_text"].strip()
-
-        texts = []
-
-        for item in result.get("output", []):
-            if item.get("type") == "message":
-                for content in item.get("content", []):
-                    if content.get("type") == "output_text":
-                        if content.get("text"):
-                            texts.append(content["text"])
-
-        answer = "\n".join(texts).strip()
-
-        if answer:
-            return answer
-
-        return "❌ AI không trả về câu trả lời."
-
-    except urllib.error.HTTPError as e:
-        try:
-            error = json.loads(
-                e.read().decode("utf-8")
-            )
-            msg = error.get("error", {}).get("message")
-
-            if msg:
-                return "❌ OpenAI API lỗi:\n" + msg
-
-        except Exception:
-            pass
-
-        return f"❌ OpenAI API lỗi HTTP {e.code}."
-
-    except Exception as e:
-        return f"❌ Lỗi AI: {e}"
-
-async def process_update(
-    update
-):
-
-    if not isinstance(
-        update,
-        dict
-    ):
-
-        return
-
-    message = (
-        update.get("message")
-        or update.get("edited_message")
-    )
-
-    if not message:
-
-        return
-
-    user = from_user(
-        message
-    )
-
-    if user:
-
-        await save_user(
-            user
-        )
-
-    RUNTIME_STATS[
-        "messages"
-    ] += 1
-
-    if is_group(message):
-
-        RUNTIME_STATS[
-            "groups"
-        ] += 1
-
-    elif is_private(message):
-
-        RUNTIME_STATS[
-            "private"
-        ] += 1
-
-    # Bot ban được xử lý trước command.
-    if user:
-
-        if await is_bot_banned(
-            user.get("id")
-        ):
-
-            if is_owner(user):
-
-                pass
-
-            else:
-
-                return
-
-        await dispatch_command(
-            message
-        )
-
-        await _original_process_update(
-            update
-        )
-
-# ============================================================
-# GET UPDATES
-# ============================================================
-
-async def get_updates(
-    offset=None,
-    timeout=30
-):
-
-    data = {
-        "timeout": timeout,
-        "allowed_updates": json.dumps(
-            [
-                "message",
-                "edited_message",
-                "chat_member"
-            ]
-        )
-    }
-
-    if offset is not None:
-
-        data["offset"] = offset
-
-    return await api(
-        "getUpdates",
-        data,
-        timeout=timeout + 10
-    )
-
-
-# ============================================================
-# POLLING ENGINE
-# ============================================================
-
-async def polling_loop():
-
-    global LAST_UPDATE_ID
-    global BOT_RUNNING
-
-    logger.info(
-        "Polling started."
-    )
-
-    while BOT_RUNNING:
-
-        try:
-
-            offset = (
-                LAST_UPDATE_ID + 1
-                if LAST_UPDATE_ID
-                else None
-            )
-
-            result = await get_updates(
-                offset=offset,
-                timeout=30
-            )
-
-            if not result.get("ok"):
-
-                logger.warning(
-                    "getUpdates failed: %s",
-                    result.get(
-                        "description"
-                    )
-                )
-
-                await asyncio.sleep(
-                    3
-                )
-
-                continue
-
-            updates = result.get(
-                "result",
-                []
-            )
-
-            for update in updates:
-
-                LAST_UPDATE_ID = max(
-                    LAST_UPDATE_ID,
-                    update.get(
-                        "update_id",
-                        0
-                    )
-                )
-
-                try:
-
-                    await process_update(
-                        update
-                    )
-
-                except Exception as e:
-
-                    logger.exception(
-                        "Update processing error: %s",
-                        e
-                    )
-
-        except KeyboardInterrupt:
-
-            BOT_RUNNING = False
-
-            break
-
-        except Exception as e:
-
-            logger.exception(
-                "Polling error: %s",
-                e
-            )
-
-            await asyncio.sleep(
-                5
-            )
-
-
-# ============================================================
-# END PHẦN 2/10
-# ============================================================
-
-# ============================================================
-# NGỌC MỸ - PURE PYTHON VERSION
-# PHẦN 3/10
-# UTILITY COMMANDS
-# /echo /calc /search /weather /short
-# ============================================================
-
-
-# ============================================================
-# ECHO
-# ============================================================
-
-async def command_echo(message, args):
-
-    if not args:
-
-        await send_message(
-            chat_id(message),
-            "❗ Dùng: <code>/echo nội dung</code>"
-        )
-
-        return
-
-    await send_message(
-        chat_id(message),
-        html.escape(args)
-    )
-
-
-# ============================================================
-# SAFE CALCULATOR
-# ============================================================
-
-CALC_OPERATORS = {
-    "add": None,
-    "sub": None,
-    "mul": None,
-    "div": None,
-    "mod": None,
-    "pow": None,
-}
-
-
-def safe_calculate(expression):
-
-    expression = expression.strip()
-
-    if not expression:
-
-        raise ValueError(
-            "Biểu thức trống."
-        )
-
-    if len(expression) > 200:
-
-        raise ValueError(
-            "Biểu thức quá dài."
-        )
-
-    allowed = re.fullmatch(
-        r"[0-9+\-*/%().,\s]+",
-        expression
-    )
-
-    if not allowed:
-
-        raise ValueError(
-            "Biểu thức chứa ký tự không hợp lệ."
-        )
-
-    expression = expression.replace(
-        ",",
-        "."
-    )
-
-    def evaluate(node):
-
-        if isinstance(
-            node,
-            __import__("ast").Expression
-        ):
-
-            return evaluate(
-                node.body
-            )
-
-        if isinstance(
-            node,
-            __import__("ast").Constant
-        ):
-
-            value = node.value
-
-            if isinstance(
-                value,
-                (int, float)
-            ):
-
-                if abs(value) > 10**100:
-
-                    raise ValueError(
-                        "Số quá lớn."
-                    )
-
-                return value
-
-            raise ValueError(
-                "Giá trị không hợp lệ."
-            )
-
-        if isinstance(
-            node,
-            __import__("ast").UnaryOp
-        ):
-
-            value = evaluate(
-                node.operand
-            )
-
-            if isinstance(
-                node.op,
-                __import__("ast").UAdd
-            ):
-
-                return +value
-
-            if isinstance(
-                node.op,
-                __import__("ast").USub
-            ):
-
-                return -value
-
-            raise ValueError(
-                "Toán tử không hợp lệ."
-            )
-
-        if isinstance(
-            node,
-            __import__("ast").BinOp
-        ):
-
-            left = evaluate(
-                node.left
-            )
-
-            right = evaluate(
-                node.right
-            )
-
-            ast = __import__(
-                "ast"
-            )
-
-            if isinstance(
-                node.op,
-                ast.Add
-            ):
-
-                result = left + right
-
-            elif isinstance(
-                node.op,
-                ast.Sub
-            ):
-
-                result = left - right
-
-            elif isinstance(
-                node.op,
-                ast.Mult
-            ):
-
-                result = left * right
-
-            elif isinstance(
-                node.op,
-                ast.Div
-            ):
-
-                if right == 0:
-
-                    raise ValueError(
-                        "Không thể chia cho 0."
-                    )
-
-                result = left / right
-
-            elif isinstance(
-                node.op,
-                ast.Mod
-            ):
-
-                if right == 0:
-
-                    raise ValueError(
-                        "Không thể chia cho 0."
-                    )
-
-                result = left % right
-
-            elif isinstance(
-                node.op,
-                ast.Pow
-            ):
-
-                if abs(right) > 100:
-
-                    raise ValueError(
-                        "Số mũ quá lớn."
-                    )
-
-                result = left ** right
-
-            else:
-
-                raise ValueError(
-                    "Toán tử không được hỗ trợ."
-                )
-
-            if isinstance(
-                result,
-                (int, float)
-            ) and abs(result) > 10**100:
-
-                raise ValueError(
-                    "Kết quả quá lớn."
-                )
-
-            return result
-
-        raise ValueError(
-            "Biểu thức không hợp lệ."
-        )
-
-    import ast
-
-    tree = ast.parse(
-        expression,
-        mode="eval"
-    )
-
-    result = evaluate(tree)
-
-    if isinstance(
-        result,
-        float
-    ):
-
-        if result.is_integer():
-
-            return str(
-                int(result)
-            )
-
-        return f"{result:.12g}"
-
-    return str(result)
-
-
-async def command_calc(
-    message,
-    args
-):
-
-    if not args:
-
-        await send_message(
-            chat_id(message),
-            (
-                "🧮 Dùng:\n"
-                "<code>/calc 2+2</code>\n"
-                "<code>/calc (10*5)/2</code>"
-            )
-        )
-
-        return
-
-    try:
-
-        result = safe_calculate(
-            args
-        )
-
-        await send_message(
-            chat_id(message),
-            (
-                "🧮 <b>KẾT QUẢ</b>\n\n"
-                f"📐 <code>"
-                f"{html.escape(args)}"
-                f"</code>\n"
-                f"🟰 <code>{result}</code>"
-            )
-        )
-
-    except Exception as e:
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ <b>Không thể tính.</b>\n"
-                f"ℹ️ {html.escape(str(e))}"
-            )
-        )
-
-
-# ============================================================
-# HTTP GET HELPER
-# Không dùng aiohttp / requests
-# ============================================================
-
-async def http_get(
-    url,
-    timeout=15
-):
-
-    def fetch():
-
-        request = Request(
-            url,
-            headers={
-                "User-Agent":
-                    "THEONE-Bot/3.0"
-            }
-        )
-
-        with urlopen(
-            request,
-            timeout=timeout
-        ) as response:
-
-            return response.read().decode(
-                "utf-8",
-                errors="replace"
-            )
-
-    return await asyncio.to_thread(
-        fetch
-    )
-
-
-# ============================================================
-# SEARCH
-# DuckDuckGo Instant Answer API
-# ============================================================
-
-async def command_search(
-    message,
-    args
-):
-
-    if not args:
-
-        await send_message(
-            chat_id(message),
-            (
-                "🔎 Dùng:\n"
-                "<code>/search từ khóa</code>"
-            )
-        )
-
-        return
-
-    try:
-
-        url = (
-            "https://api.duckduckgo.com/?"
-            + urlencode(
-                {
-                    "q": args,
-                    "format": "json",
-                    "no_html": "1",
-                    "skip_disambig": "0"
-                }
-            )
-        )
-
-        raw = await http_get(
-            url
-        )
-
-        data = json.loads(
-            raw
-        )
-
-        abstract = (
-            data.get(
-                "AbstractText"
-            )
-            or ""
-        )
-
-        heading = (
-            data.get(
-                "Heading"
-            )
-            or ""
-        )
-
-        answer = (
-            data.get(
-                "Answer"
-            )
-            or ""
-        )
-
-        abstract_url = (
-            data.get(
-                "AbstractURL"
-            )
-            or ""
-        )
-
-        if answer:
-
-            text = (
-                "🔎 <b>KẾT QUẢ TÌM KIẾM</b>\n\n"
-                f"{html.escape(answer)}"
-            )
-
-            if abstract_url:
-
-                text += (
-                    "\n\n🔗 "
-                    f'<a href="{html.escape(abstract_url)}">'
-                    "Nguồn"
-                    "</a>"
-                )
-
-            await send_message(
-                chat_id(message),
-                text
-            )
-
-            return
-
-        if abstract:
-
-            text = (
-                "🔎 <b>"
-                + html.escape(
-                    heading
-                )
-                + "</b>\n\n"
-                + html.escape(
-                    abstract[:3500]
-                )
-            )
-
-            if abstract_url:
-
-                text += (
-                    "\n\n🔗 "
-                    f'<a href="{html.escape(abstract_url)}">'
-                    "Xem thêm"
-                    "</a>"
-                )
-
-            await send_message(
-                chat_id(message),
-                text
-            )
-
-            return
-
-        related = data.get(
-            "RelatedTopics",
-            []
-        )
-
-        results = []
-
-        for item in related:
-
-            if not isinstance(
-                item,
-                dict
-            ):
-
-                continue
-
-            text_value = item.get(
-                "Text"
-            )
-
-            first_url = item.get(
-                "FirstURL"
-            )
-
-            if (
-                text_value
-                and first_url
-            ):
-
-                results.append(
-                    (
-                        text_value,
-                        first_url
-                    )
-                )
-
-            if len(results) >= 5:
-
-                break
-
-        if not results:
-
-            await send_message(
-                chat_id(message),
-                (
-                    "🔎 Không tìm thấy "
-                    "kết quả phù hợp."
-                )
-            )
-
-            return
-
-        lines = [
-            "🔎 <b>KẾT QUẢ</b>\n"
-        ]
-
-        for index, (
-            title,
-            result_url
-        ) in enumerate(
-            results,
-            1
-        ):
-
-            lines.append(
-                f"{index}. "
-                f'<a href="{html.escape(result_url)}">'
-                f"{html.escape(title[:300])}"
-                "</a>"
-            )
-
-        await send_message(
-            chat_id(message),
-            "\n".join(lines)
-        )
-
-    except Exception as e:
-
-        logger.warning(
-            "Search error: %s",
-            e
-        )
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể tìm kiếm "
-                "lúc này."
-            )
-        )
-
-
-# ============================================================
-# WEATHER
-# wttr.in
-# ============================================================
-
-async def command_weather(
-    message,
-    args
-):
-
-    if not args:
-
-        await send_message(
-            chat_id(message),
-            (
-                "🌤 Dùng:\n"
-                "<code>/weather Cà Mau</code>"
-            )
-        )
-
-        return
-
-    try:
-
-        city = args.strip()
-
-        url = (
-            "https://wttr.in/"
-            + __import__(
-                "urllib.parse",
-                fromlist=["quote"]
-            ).quote(
-                city
-            )
-            + "?format=j1"
-        )
-
-        raw = await http_get(
-            url
-        )
-
-        data = json.loads(
-            raw
-        )
-
-        current = (
-            data.get(
-                "current_condition",
-                [{}]
-            )[0]
-        )
-
-        temp = current.get(
-            "temp_C",
-            "?"
-        )
-
-        feels = current.get(
-            "FeelsLikeC",
-            "?"
-        )
-
-        humidity = current.get(
-            "humidity",
-            "?"
-        )
-
-        wind = current.get(
-            "windspeedKmph",
-            "?"
-        )
-
-        descriptions = (
-            current.get(
-                "weatherDesc",
-                [{}]
-            )
-        )
-
-        description = (
-            descriptions[0].get(
-                "value",
-                "Không rõ"
-            )
-            if descriptions
-            else "Không rõ"
-        )
-
-        await send_message(
-            chat_id(message),
-            (
-                "🌤 <b>THỜI TIẾT</b>\n\n"
-                f"📍 Thành phố: "
-                f"<b>{html.escape(city)}</b>\n"
-                f"🌡 Nhiệt độ: "
-                f"<code>{temp}°C</code>\n"
-                f"🤒 Cảm giác: "
-                f"<code>{feels}°C</code>\n"
-                f"☁️ Trạng thái: "
-                f"{html.escape(description)}\n"
-                f"💧 Độ ẩm: "
-                f"<code>{humidity}%</code>\n"
-                f"💨 Gió: "
-                f"<code>{wind} km/h</code>"
-            )
-        )
-
-    except Exception as e:
-
-        logger.warning(
-            "Weather error: %s",
-            e
-        )
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không lấy được "
-                "thời tiết.\n"
-                "Hãy kiểm tra tên thành phố."
-            )
-        )
-
-
-# ============================================================
-# URL SHORTENER
-# is.gd
-# ============================================================
-
-async def command_short(
-    message,
-    args
-):
-
-    if not args:
-
-        await send_message(
-            chat_id(message),
-            (
-                "🔗 Dùng:\n"
-                "<code>/short https://example.com</code>"
-            )
-        )
-
-        return
-
-    url = args.strip()
-
-    if not re.match(
-        r"^https?://",
-        url,
-        re.IGNORECASE
+    if not await is_owner(
+        get_user_id(message)
     ):
 
         await send_message(
-            chat_id(message),
-            (
-                "❌ URL phải bắt đầu bằng "
-                "<code>http://</code> hoặc "
-                "<code>https://</code>."
-            )
+            get_chat_id(message),
+            OWNER_ONLY_MESSAGE,
+            get_message_id(message)
         )
 
         return
 
-    try:
-
-        api_url = (
-            "https://is.gd/create.php?"
-            + urlencode(
-                {
-                    "format": "simple",
-                    "url": url
-                }
-            )
-        )
-
-        short_url = (
-            await http_get(
-                api_url
-            )
-        ).strip()
-
-        if (
-            not short_url
-            or not short_url.startswith(
-                "http"
-            )
-        ):
-
-            raise ValueError(
-                "Invalid short URL"
-            )
-
-        await send_message(
-            chat_id(message),
-            (
-                "🔗 <b>LINK ĐÃ RÚT GỌN</b>\n\n"
-                f"🌐 URL gốc:\n"
-                f"<code>{html.escape(url)}</code>\n\n"
-                f"⚡ Link mới:\n"
-                f'<a href="{html.escape(short_url)}">'
-                f"{html.escape(short_url)}"
-                "</a>"
-            )
-        )
-
-    except Exception as e:
-
-        logger.warning(
-            "Short URL error: %s",
-            e
-        )
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể rút gọn "
-                "liên kết này."
-            )
-        )
-
-
-# ============================================================
-# REGISTER UTILITY COMMANDS
-# ============================================================
-
-COMMAND_HANDLERS.update({
-
-    "echo":
-        lambda message, args:
-            command_echo(
-                message,
-                args
-            ),
-
-    "calc":
-        lambda message, args:
-            command_calc(
-                message,
-                args
-            ),
-
-    "search":
-        lambda message, args:
-            command_search(
-                message,
-                args
-            ),
-
-    "weather":
-        lambda message, args:
-            command_weather(
-                message,
-                args
-            ),
-
-    "short":
-        lambda message, args:
-            command_short(
-                message,
-                args
-            ),
-})
-
-
-# ============================================================
-# IMPROVED COMMAND DISPATCHER
-# ============================================================
-
-async def dispatch_command(
-    message
-):
-
-    command, args = parse_command(
-        message
-    )
-
-    if not command:
-
-        return False
-
-    handler = COMMAND_HANDLERS.get(
-        command
-    )
-
-    if not handler:
-
-        return False
-
-    try:
-
-        await handler(
-            message,
-            args
-        )
-
-    except TypeError:
-
-        # Các handler cũ không nhận args.
-        await handler(
-            message
-        )
-
-    return True
-
-
-# ============================================================
-# END PHẦN 3/10
-# ============================================================
-
-# ============================================================
-# THEONE BOT - PURE PYTHON VERSION
-# PHẦN 4/10
-# GROUP MODERATION
-# /warn /warns /mute /unmute /kick /ban /unban
-# /purge /pin /unpin /lock /unlock
-# ============================================================
-
-
-# ============================================================
-# TARGET RESOLVER
-# Hỗ trợ:
-# - Reply
-# - Telegram ID
-# - @username
-# ============================================================
-
-async def resolve_target(message, args):
-    reply = message.get("reply_to_message")
-
-    if reply:
-        target = reply.get("from")
-
-        if target:
-            return target
-
-    if not args:
-        return None
-
-    first = args.split()[0].strip()
-
-    if first.startswith("@"):
-        username = first[1:].lower()
-
-        result = await api(
-            "getChatAdministrators",
-            {
-                "chat_id": chat_id(message)
-            }
-        )
-
-        if result.get("ok"):
-            for member in result.get("result", []):
-                user = member.get("user", {})
-
-                if (
-                    user.get("username", "")
-                    .lower()
-                    == username
-                ):
-                    return user
-
-        return {
-            "id": None,
-            "username": username,
-            "first_name": username
-        }
-
-    if re.fullmatch(r"-?\d+", first):
-
-        user_id = int(first)
-
-        member = await get_chat_member(
-            chat_id(message),
-            user_id
-        )
-
-        if member:
-            return member.get("user")
-
-        return {
-            "id": user_id,
-            "first_name": str(user_id)
-        }
-
-    return None
-
-
-# ============================================================
-# CHECK TARGET
-# ============================================================
-
-async def ensure_valid_target(
-    message,
-    target
-):
-
-    if not target:
-        await send_message(
-            chat_id(message),
-            (
-                "❗ Không xác định được "
-                "người dùng.\n\n"
-                "Reply tin nhắn hoặc dùng "
-                "<code>@username</code> / "
-                "<code>Telegram ID</code>."
-            )
-        )
-        return False
-
-    if not target.get("id"):
-        await send_message(
-            chat_id(message),
-            "❌ Không tìm thấy người dùng này."
-        )
-        return False
-
-    if target.get("id") == from_user(message).get("id"):
-        await send_message(
-            chat_id(message),
-            "❌ Không thể tự áp dụng lệnh này cho chính mình."
-        )
-        return False
-
-    return True
-
-
-# ============================================================
-# CHECK BOT ADMIN
-# ============================================================
-
-async def bot_is_admin(message):
-
-    member = await get_chat_member(
-        chat_id(message),
-        (await api("getMe")).get(
-            "result",
-            {}
-        ).get("id")
-    )
-
-    if not member:
-        return False
-
-    return member.get("status") in {
-        "administrator",
-        "creator"
-    }
-
-
-# ============================================================
-# WARN
-# ============================================================
-
-async def command_warn(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    target = await resolve_target(
-        message,
-        args
-    )
-
-    if not await ensure_valid_target(
-        message,
-        target
-    ):
-        return
-
-    target_id = target.get("id")
-
-    reason = ""
-
-    if args:
-        parts = args.split()
-
-        if parts:
-            first = parts[0]
-
-            if (
-                first.startswith("@")
-                or re.fullmatch(
-                    r"-?\d+",
-                    first
-                )
-            ):
-                reason = " ".join(
-                    parts[1:]
-                )
-
-    if not reason:
-        reason = "Không có lý do"
-
-    await adb_execute(
-        """
-        INSERT INTO warns
-        (
-            chat_id,
-            user_id,
-            reason,
-            created_at
-        )
-        VALUES (?, ?, ?, ?)
-        """,
-        (
-            chat_id(message),
-            target_id,
-            reason,
-            datetime.now(
-                timezone.utc
-            ).isoformat()
-        )
-    )
-
-    row = await adb_execute(
-        """
-        SELECT COUNT(*) AS c
-        FROM warns
-        WHERE chat_id = ?
-        AND user_id = ?
-        """,
-        (
-            chat_id(message),
-            target_id
-        ),
-        fetchone=True
-    )
-
-    count = row["c"]
-
-    await send_message(
-        chat_id(message),
-        (
-            "⚠️ <b>CẢNH CÁO</b>\n\n"
-            f"👤 {mention_user(target)}\n"
-            f"📌 Lý do: "
-            f"{html.escape(reason)}\n"
-            f"🔢 Số cảnh cáo: "
-            f"<code>{count}</code>"
-        )
-    )
-
-
-# ============================================================
-# WARNS
-# ============================================================
-
-async def command_warns(
-    message,
-    args
-):
-
-    if not await require_group(message):
-        return
-
-    target = await resolve_target(
-        message,
-        args
-    )
-
-    if not target:
-
-        target = from_user(
-            message
-        )
-
-    target_id = target.get(
-        "id"
-    )
-
-    rows = await adb_execute(
-        """
-        SELECT reason, created_at
-        FROM warns
-        WHERE chat_id = ?
-        AND user_id = ?
-        ORDER BY id DESC
-        LIMIT 20
-        """,
-        (
-            chat_id(message),
-            target_id
-        ),
-        fetch=True
-    )
-
-    if not rows:
-
-        await send_message(
-            chat_id(message),
-            (
-                f"👤 {mention_user(target)}\n\n"
-                "✅ Người dùng này chưa có cảnh cáo."
-            )
-        )
-
-        return
-
-    lines = [
-        "⚠️ <b>DANH SÁCH CẢNH CÁO</b>\n",
-        f"👤 {mention_user(target)}",
-        ""
-    ]
-
-    for index, row in enumerate(
-        rows,
-        1
-    ):
-
-        created = row["created_at"]
-
-        reason = html.escape(
-            row["reason"]
-            or "Không có lý do"
-        )
-
-        lines.append(
-            f"{index}. {reason}\n"
-            f"   🕐 {created}"
-        )
-
-    await send_message(
-        chat_id(message),
-        "\n".join(lines)
-    )
-
-
-# ============================================================
-# PARSE MODERATION TARGET
-# ============================================================
-
-def parse_target_and_duration(
-    args
-):
-
-    parts = args.split()
-
-    target_arg = None
-    duration = None
-    reason_parts = []
-
-    for part in parts:
-
-        if (
-            duration is None
-            and parse_duration(part)
-            is not None
-        ):
-
-            duration = parse_duration(
-                part
-            )
-
-            continue
-
-        if target_arg is None:
-
-            target_arg = part
-
-            continue
-
-        reason_parts.append(
-            part
-        )
-
-    reason = " ".join(
-        reason_parts
-    ).strip()
-
-    return (
-        target_arg,
-        duration,
-        reason
-    )
-
-
-# ============================================================
-# MUTE
-# Telegram restrictChatMember
-# ============================================================
-
-async def command_mute(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    if not await bot_is_admin(message):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Bot chưa là admin "
-                "hoặc không có quyền hạn chế thành viên."
-            )
-        )
-
-        return
-
-    target = await resolve_target(
-        message,
-        args
-    )
-
-    if not await ensure_valid_target(
-        message,
-        target
-    ):
-        return
-
-    parts = args.split()
-
-    duration = None
-
-    for part in parts:
-
-        parsed = parse_duration(
-            part
-        )
-
-        if parsed is not None:
-
-            duration = parsed
-
-            break
-
-    if duration is None:
-
-        duration = 3600
-
-    until_date = int(
+    uptime = int(
         time.time()
-        + duration
+        - START_TIME
     )
 
-    result = await api(
-        "restrictChatMember",
-        {
-            "chat_id":
-                chat_id(message),
-
-            "user_id":
-                target.get("id"),
-
-            "permissions":
-                json.dumps(
-                    {
-                        "can_send_messages": False,
-                        "can_send_audios": False,
-                        "can_send_documents": False,
-                        "can_send_photos": False,
-                        "can_send_videos": False,
-                        "can_send_video_notes": False,
-                        "can_send_voice_notes": False,
-                        "can_send_polls": False,
-                        "can_send_other_messages": False,
-                        "can_add_web_page_previews": False,
-                        "can_change_info": False,
-                        "can_invite_users": False,
-                        "can_pin_messages": False,
-                        "can_manage_topics": False
-                    }
-                ),
-
-            "until_date":
-                until_date
-        }
-    )
-
-    if not result.get("ok"):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể mute.\n"
-                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
-            )
-        )
-
-        return
-
-    await send_message(
-        chat_id(message),
-        (
-            "🔇 <b>ĐÃ MUTE</b>\n\n"
-            f"👤 {mention_user(target)}\n"
-            f"⏱ Thời gian: "
-            f"<code>{format_duration(duration)}</code>"
-        )
-    )
-
-
-# ============================================================
-# UNMUTE
-# ============================================================
-
-async def command_unmute(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    if not await bot_is_admin(message):
-
-        await send_message(
-            chat_id(message),
-            "❌ Bot không có quyền quản lý thành viên."
-        )
-
-        return
-
-    target = await resolve_target(
-        message,
-        args
-    )
-
-    if not await ensure_valid_target(
-        message,
-        target
-    ):
-        return
-
-    result = await api(
-        "restrictChatMember",
-        {
-            "chat_id":
-                chat_id(message),
-
-            "user_id":
-                target.get("id"),
-
-            "permissions":
-                json.dumps(
-                    {
-                        "can_send_messages": True,
-                        "can_send_audios": True,
-                        "can_send_documents": True,
-                        "can_send_photos": True,
-                        "can_send_videos": True,
-                        "can_send_video_notes": True,
-                        "can_send_voice_notes": True,
-                        "can_send_polls": True,
-                        "can_send_other_messages": True,
-                        "can_add_web_page_previews": True,
-                        "can_change_info": False,
-                        "can_invite_users": True,
-                        "can_pin_messages": False,
-                        "can_manage_topics": False
-                    }
-                )
-        }
-    )
-
-    if not result.get("ok"):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể unmute.\n"
-                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
-            )
-        )
-
-        return
-
-    await send_message(
-        chat_id(message),
-        (
-            "🔊 <b>ĐÃ UNMUTE</b>\n\n"
-            f"👤 {mention_user(target)}"
-        )
-    )
-
-
-# ============================================================
-# KICK
-# ============================================================
-
-async def command_kick(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    if not await bot_is_admin(message):
-
-        await send_message(
-            chat_id(message),
-            "❌ Bot không có quyền kick thành viên."
-        )
-
-        return
-
-    target = await resolve_target(
-        message,
-        args
-    )
-
-    if not await ensure_valid_target(
-        message,
-        target
-    ):
-        return
-
-    result = await api(
-        "banChatMember",
-        {
-            "chat_id":
-                chat_id(message),
-
-            "user_id":
-                target.get("id"),
-
-            "revoke_messages":
-                False
-        }
-    )
-
-    if not result.get("ok"):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể kick.\n"
-                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
-            )
-        )
-
-        return
-
-    await api(
-        "unbanChatMember",
-        {
-            "chat_id":
-                chat_id(message),
-
-            "user_id":
-                target.get("id"),
-
-            "only_if_banned":
-                True
-        }
-    )
-
-    await send_message(
-        chat_id(message),
-        (
-            "👢 <b>ĐÃ KICK</b>\n\n"
-            f"👤 {mention_user(target)}"
-        )
-    )
-
-
-# ============================================================
-# BAN
-# ============================================================
-
-async def command_ban(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    if not await bot_is_admin(message):
-
-        await send_message(
-            chat_id(message),
-            "❌ Bot không có quyền ban thành viên."
-        )
-
-        return
-
-    target = await resolve_target(
-        message,
-        args
-    )
-
-    if not await ensure_valid_target(
-        message,
-        target
-    ):
-        return
-
-    duration = None
-
-    for part in args.split():
-
-        parsed = parse_duration(
-            part
-        )
-
-        if parsed is not None:
-
-            duration = parsed
-
-            break
-
-    data = {
-        "chat_id":
-            chat_id(message),
-
-        "user_id":
-            target.get("id"),
-
-        "revoke_messages":
-            True
-    }
-
-    if duration is not None:
-
-        data["until_date"] = int(
-            time.time()
-            + duration
-        )
-
-    result = await api(
-        "banChatMember",
-        data
-    )
-
-    if not result.get("ok"):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể ban.\n"
-                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
-            )
-        )
-
-        return
-
-    duration_text = (
-        format_duration(duration)
-        if duration
-        else "Vĩnh viễn"
-    )
-
-    await send_message(
-        chat_id(message),
-        (
-            "🔨 <b>ĐÃ BAN</b>\n\n"
-            f"👤 {mention_user(target)}\n"
-            f"⏱ Thời gian: "
-            f"<code>{duration_text}</code>"
-        )
-    )
-
-
-# ============================================================
-# UNBAN
-# ============================================================
-
-async def command_unban(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    if not await bot_is_admin(message):
-
-        await send_message(
-            chat_id(message),
-            "❌ Bot không có quyền unban."
-        )
-
-        return
-
-    target = await resolve_target(
-        message,
-        args
-    )
-
-    if not await ensure_valid_target(
-        message,
-        target
-    ):
-        return
-
-    result = await api(
-        "unbanChatMember",
-        {
-            "chat_id":
-                chat_id(message),
-
-            "user_id":
-                target.get("id"),
-
-            "only_if_banned":
-                False
-        }
-    )
-
-    if not result.get("ok"):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể unban.\n"
-                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
-            )
-        )
-
-        return
-
-    await send_message(
-        chat_id(message),
-        (
-            "🔓 <b>ĐÃ UNBAN</b>\n\n"
-            f"👤 {mention_user(target)}"
-        )
-    )
-
-
-# ============================================================
-# PURGE
-# ============================================================
-
-async def command_purge(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    if not await bot_is_admin(message):
-
-        await send_message(
-            chat_id(message),
-            "❌ Bot không có quyền xóa tin nhắn."
-        )
-
-        return
-
-    try:
-
-        amount = int(
-            args.split()[0]
-        )
-
-    except Exception:
-
-        amount = 10
-
-    amount = max(
-        1,
-        min(
-            amount,
-            100
-        )
-    )
-
-    current_id = message_id(
-        message
-    )
-
-    deleted = 0
-
-    for msg_id in range(
-        current_id,
-        max(
-            0,
-            current_id - amount
-        ),
-        -1
-    ):
-
-        result = await delete_message(
-            chat_id(message),
-            msg_id
-        )
-
-        if result.get("ok"):
-
-            deleted += 1
-
-            RUNTIME_STATS[
-                "deleted"
-            ] += 1
-
-    confirmation = await send_message(
-        chat_id(message),
-        (
-            "🧹 Đã xóa "
-            f"<code>{deleted}</code> "
-            "tin nhắn."
-        )
-    )
-
-    if confirmation.get("ok"):
-
-        await asyncio.sleep(
-            2
-        )
-
-        await delete_message(
-            chat_id(message),
-            confirmation["result"]["message_id"]
-        )
-
-
-# ============================================================
-# PIN
-# ============================================================
-
-async def command_pin(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    reply = message.get(
-        "reply_to_message"
-    )
-
-    if not reply:
-
-        await send_message(
-            chat_id(message),
-            "❗ Hãy reply tin nhắn cần ghim."
-        )
-
-        return
-
-    result = await pin_message(
-        chat_id(message),
-        reply.get("message_id")
-    )
-
-    if not result.get("ok"):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể ghim.\n"
-                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
-            )
-        )
-
-        return
-
-    await send_message(
-        chat_id(message),
-        "📌 Đã ghim tin nhắn."
-    )
-
-
-# ============================================================
-# UNPIN
-# ============================================================
-
-async def command_unpin(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    reply = message.get(
-        "reply_to_message"
-    )
-
-    if reply:
-
-        result = await unpin_message(
-            chat_id(message),
-            reply.get("message_id")
-        )
-
-    else:
-
-        result = await api(
-            "unpinChatMessage",
-            {
-                "chat_id":
-                    chat_id(message)
-            }
-        )
-
-    if not result.get("ok"):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể bỏ ghim.\n"
-                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
-            )
-        )
-
-        return
-
-    await send_message(
-        chat_id(message),
-        "📌 Đã bỏ ghim."
-    )
-
-
-# ============================================================
-# LOCK
-# ============================================================
-
-async def command_lock(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    if not await bot_is_admin(message):
-
-        await send_message(
-            chat_id(message),
-            "❌ Bot không có quyền khóa nhóm."
-        )
-
-        return
-
-    result = await api(
-        "setChatPermissions",
-        {
-            "chat_id":
-                chat_id(message),
-
-            "permissions":
-                json.dumps(
-                    {
-                        "can_send_messages": False,
-                        "can_send_audios": False,
-                        "can_send_documents": False,
-                        "can_send_photos": False,
-                        "can_send_videos": False,
-                        "can_send_video_notes": False,
-                        "can_send_voice_notes": False,
-                        "can_send_polls": False,
-                        "can_send_other_messages": False,
-                        "can_add_web_page_previews": False,
-                        "can_change_info": False,
-                        "can_invite_users": False,
-                        "can_pin_messages": False,
-                        "can_manage_topics": False
-                    }
-                )
-        }
-    )
-
-    if not result.get("ok"):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể khóa nhóm.\n"
-                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
-            )
-        )
-
-        return
-
-    await send_message(
-        chat_id(message),
-        "🔒 <b>ĐÃ KHÓA NHÓM</b>"
-    )
-
-
-# ============================================================
-# UNLOCK
-# ============================================================
-
-async def command_unlock(
-    message,
-    args
-):
-
-    if not await require_admin(message):
-        return
-
-    if not await bot_is_admin(message):
-
-        await send_message(
-            chat_id(message),
-            "❌ Bot không có quyền mở khóa nhóm."
-        )
-
-        return
-
-    result = await api(
-        "setChatPermissions",
-        {
-            "chat_id":
-                chat_id(message),
-
-            "permissions":
-                json.dumps(
-                    {
-                        "can_send_messages": True,
-                        "can_send_audios": True,
-                        "can_send_documents": True,
-                        "can_send_photos": True,
-                        "can_send_videos": True,
-                        "can_send_video_notes": True,
-                        "can_send_voice_notes": True,
-                        "can_send_polls": True,
-                        "can_send_other_messages": True,
-                        "can_add_web_page_previews": True,
-                        "can_change_info": False,
-                        "can_invite_users": True,
-                        "can_pin_messages": False,
-                        "can_manage_topics": False
-                    }
-                )
-        }
-    )
-
-    if not result.get("ok"):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không thể mở khóa nhóm.\n"
-                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
-            )
-        )
-
-        return
-
-    await send_message(
-        chat_id(message),
-        "🔓 <b>ĐÃ MỞ KHÓA NHÓM</b>"
-    )
-
-
-# ============================================================
-# REGISTER MODERATION COMMANDS
-# ============================================================
-
-COMMAND_HANDLERS.update({
-
-    "warn":
-        lambda message, args:
-            command_warn(
-                message,
-                args
-            ),
-
-    "warns":
-        lambda message, args:
-            command_warns(
-                message,
-                args
-            ),
-
-    "mute":
-        lambda message, args:
-            command_mute(
-                message,
-                args
-            ),
-
-    "unmute":
-        lambda message, args:
-            command_unmute(
-                message,
-                args
-            ),
-
-    "kick":
-        lambda message, args:
-            command_kick(
-                message,
-                args
-            ),
-
-    "ban":
-        lambda message, args:
-            command_ban(
-                message,
-                args
-            ),
-
-    "unban":
-        lambda message, args:
-            command_unban(
-                message,
-                args
-            ),
-
-    "purge":
-        lambda message, args:
-            command_purge(
-                message,
-                args
-            ),
-
-    "pin":
-        lambda message, args:
-            command_pin(
-                message,
-                args
-            ),
-
-    "unpin":
-        lambda message, args:
-            command_unpin(
-                message,
-                args
-            ),
-
-    "lock":
-        lambda message, args:
-            command_lock(
-                message,
-                args
-            ),
-
-    "unlock":
-        lambda message, args:
-            command_unlock(
-                message,
-                args
-            ),
-})
-
-
-# ============================================================
-# END PHẦN 4/10
-# ============================================================
-
-# ============================================================
-# THEONE BOT - PURE PYTHON VERSION
-# PHẦN 5/10
-# BOT ADMIN + SYSTEM
-# /admins /broadcast /users /banuser /unbanuser
-# /restart /logs /database /health /version
-# ============================================================
-
-
-# ============================================================
-# ADMIN LIST
-# ============================================================
-
-async def command_admins(
-    message,
-    args
-):
-
-    if not await require_group(message):
-        return
-
-    result = await api(
-        "getChatAdministrators",
-        {
-            "chat_id":
-                chat_id(message)
-        }
-    )
-
-    if not result.get("ok"):
-
-        await send_message(
-            chat_id(message),
-            (
-                "❌ Không lấy được danh sách admin.\n"
-                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
-            )
-        )
-
-        return
-
-    admins = result.get(
-        "result",
-        []
-    )
-
-    lines = [
-        "👑 <b>QUẢN TRỊ VIÊN NHÓM</b>\n"
-    ]
-
-    for index, member in enumerate(
-        admins,
-        1
-    ):
-
-        user = member.get(
-            "user",
-            {}
-        )
-
-        status = member.get(
-            "status",
-            ""
-        )
-
-        role = (
-            "👑 Owner"
-            if status == "creator"
-            else "🛡 Admin"
-        )
-
-        username = (
-            "@" + html.escape(
-                user.get("username")
-            )
-            if user.get("username")
-            else "Không có username"
-        )
-
-        lines.append(
-            f"{index}. "
-            f"{mention_user(user)}\n"
-            f"   {role} | {username}"
-        )
-
-    await send_message(
-        chat_id(message),
-        "\n".join(lines)
-    )
-
-
-# ============================================================
-# GET ALL KNOWN USER IDS
-# ============================================================
-
-async def get_all_user_ids():
-
-    rows = await adb_execute(
-        """
-        SELECT user_id
-        FROM users
-        ORDER BY user_id
-        """,
-        fetch=True
-    )
-
-    return [
-        row["user_id"]
-        for row in rows
-    ]
-
-
-# ============================================================
-# BROADCAST
-# ============================================================
-
-async def command_broadcast(
-    message,
-    args
-):
-
-    if not await require_owner(message):
-        return
-
-    if not args:
-
-        await send_message(
-            chat_id(message),
-            (
-                "📢 Dùng:\n"
-                "<code>/broadcast nội dung</code>"
-            )
-        )
-
-        return
-
-    users = await get_all_user_ids()
-
-    if not users:
-
-        await send_message(
-            chat_id(message),
-            "📢 Chưa có user nào trong database."
-        )
-
-        return
-
-    success = 0
-    failed = 0
-
-    status_message = await send_message(
-        chat_id(message),
-        (
-            "📢 <b>ĐANG BROADCAST</b>\n\n"
-            f"👥 Tổng: <code>{len(users)}</code>"
-        )
-    )
-
-    for user_id in users:
-
-        result = await send_message(
-            user_id,
-            args
-        )
-
-        if result.get("ok"):
-
-            success += 1
-
-        else:
-
-            failed += 1
-
-        # Giảm tốc độ gửi để hạn chế Telegram flood limit.
-        await asyncio.sleep(
-            0.05
-        )
+    hours = uptime // 3600
+    minutes = (
+        uptime % 3600
+    ) // 60
+    seconds = uptime % 60
 
     text = (
-        "📢 <b>BROADCAST HOÀN TẤT</b>\n\n"
-        f"✅ Thành công: <code>{success}</code>\n"
-        f"❌ Thất bại: <code>{failed}</code>\n"
-        f"👥 Tổng: <code>{len(users)}</code>"
-    )
-
-    if status_message.get("ok"):
-
-        await edit_message(
-            chat_id(message),
-            status_message["result"]["message_id"],
-            text
-        )
-
-    else:
-
-        await send_message(
-            chat_id(message),
-            text
-        )
-
-
-# ============================================================
-# USERS
-# ============================================================
-
-async def command_users(
-    message,
-    args
-):
-
-    if not await require_owner(message):
-        return
-
-    row = await adb_execute(
-        """
-        SELECT COUNT(*) AS c
-        FROM users
-        """,
-        fetchone=True
-    )
-
-    groups = RUNTIME_STATS[
-        "groups"
-    ]
-
-    private = RUNTIME_STATS[
-        "private"
-    ]
-
-    await send_message(
-        chat_id(message),
-        (
-            "👥 <b>USER DATABASE</b>\n\n"
-            f"👤 Users: <code>{row['c']}</code>\n"
-            f"👥 Group messages: <code>{groups}</code>\n"
-            f"💬 Private messages: <code>{private}</code>"
-        )
-    )
-
-
-# ============================================================
-# BAN USER FROM BOT
-# ============================================================
-
-async def command_banuser(
-    message,
-    args
-):
-
-    if not await require_owner(message):
-        return
-
-    target = await resolve_target(
-        message,
-        args
-    )
-
-    if not target:
-
-        await send_message(
-            chat_id(message),
-            (
-                "❗ Dùng:\n"
-                "<code>/banuser ID</code>"
-            )
-        )
-
-        return
-
-    target_id = target.get(
-        "id"
-    )
-
-    if not target_id:
-
-        await send_message(
-            chat_id(message),
-            "❌ ID không hợp lệ."
-        )
-
-        return
-
-    if is_owner(
-        target
-    ):
-
-        await send_message(
-            chat_id(message),
-            "❌ Không thể ban Owner."
-        )
-
-        return
-
-    await adb_execute(
-        """
-        INSERT INTO bot_bans
-        (
-            user_id,
-            reason,
-            created_at
-        )
-        VALUES (?, ?, ?)
-        ON CONFLICT(user_id)
-        DO UPDATE SET
-            reason = excluded.reason,
-            created_at = excluded.created_at
-        """,
-        (
-            target_id,
-            args,
-            datetime.now(
-                timezone.utc
-            ).isoformat()
-        )
+        "<b>📊 NGỌC MỸ STATS</b>\n\n"
+        f"💬 Messages: "
+        f"{RUNTIME_STATS['messages']}\n"
+        f"👥 Groups: "
+        f"{RUNTIME_STATS['groups']}\n"
+        f"💬 Private: "
+        f"{RUNTIME_STATS['private']}\n"
+        f"🗑 Deleted: "
+        f"{RUNTIME_STATS['deleted']}\n"
+        f"🛡 Filter hits: "
+        f"{RUNTIME_STATS['filter_hits']}\n"
+        f"⏱ Uptime: "
+        f"{hours}h {minutes}m {seconds}s"
     )
 
     await send_message(
-        chat_id(message),
-        (
-            "🚫 <b>ĐÃ CẤM USER DÙNG BOT</b>\n\n"
-            f"🆔 ID: <code>{target_id}</code>"
-        )
+        get_chat_id(message),
+        text,
+        get_message_id(message)
     )
 
 
 # ============================================================
-# UNBAN USER FROM BOT
+# SAFE TEXT HELPERS
 # ============================================================
 
-async def command_unbanuser(
-    message,
-    args
-):
-
-    if not await require_owner(message):
-        return
-
-    target = await resolve_target(
-        message,
-        args
-    )
-
-    if not target:
-
-        await send_message(
-            chat_id(message),
-            (
-                "❗ Dùng:\n"
-                "<code>/unbanuser ID</code>"
-            )
-        )
-
-        return
-
-    target_id = target.get(
-        "id"
-    )
-
-    if not target_id:
-
-        await send_message(
-            chat_id(message),
-            "❌ ID không hợp lệ."
-        )
-
-        return
-
-    await adb_execute(
-        """
-        DELETE FROM bot_bans
-        WHERE user_id = ?
-        """,
-        (
-            target_id,
-        )
-    )
-
-    await send_message(
-        chat_id(message),
-        (
-            "🔓 <b>ĐÃ GỠ CẤM USER</b>\n\n"
-            f"🆔 ID: <code>{target_id}</code>"
-        )
-    )
-
-
-# ============================================================
-# RESTART
-# ============================================================
-
-async def command_restart(
-    message,
-    args
-):
-
-    global BOT_RUNNING
-
-    if not await require_owner(message):
-        return
-
-    await send_message(
-        chat_id(message),
-        "🔄 <b>Đang khởi động lại bot...</b>"
-    )
-
-    BOT_RUNNING = False
-
-    # Thoát process để Railway / Termux
-    # có thể tự khởi động lại process.
-    await asyncio.sleep(
-        1
-    )
-
-    os._exit(0)
-
-
-# ============================================================
-# LOGS
-# ============================================================
-
-async def command_logs(
-    message,
-    args
-):
-
-    if not await require_owner(message):
-        return
-
-    rows = await adb_execute(
-        """
-        SELECT
-            user_id,
-            username,
-            first_name,
-            last_seen,
-            message_count
-        FROM users
-        ORDER BY last_seen DESC
-        LIMIT 15
-        """,
-        fetch=True
-    )
-
-    lines = [
-        "📜 <b>RECENT USER LOGS</b>\n"
-    ]
-
-    if not rows:
-
-        lines.append(
-            "Chưa có dữ liệu."
-        )
-
-    else:
-
-        for row in rows:
-
-            username = (
-                "@"
-                + row["username"]
-                if row["username"]
-                else "no_username"
-            )
-
-            first_name = (
-                row["first_name"]
-                or "Unknown"
-            )
-
-            lines.append(
-                f"👤 "
-                f"{html.escape(first_name)} "
-                f"({html.escape(username)})\n"
-                f"🆔 <code>{row['user_id']}</code>\n"
-                f"💬 Messages: "
-                f"<code>{row['message_count']}</code>\n"
-                f"🕐 Last: "
-                f"<code>{html.escape(row['last_seen'])}</code>\n"
-            )
-
-    await send_message(
-        chat_id(message),
-        "\n".join(lines)
-    )
-
-
-# ============================================================
-# DATABASE
-# ============================================================
-
-async def command_database(
-    message,
-    args
-):
-
-    if not await require_owner(message):
-        return
-
-    conn = db_connect()
-
-    try:
-
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-            SELECT name
-            FROM sqlite_master
-            WHERE type = 'table'
-            ORDER BY name
-            """
-        )
-
-        tables = [
-            row[0]
-            for row in cursor.fetchall()
-        ]
-
-        try:
-
-            size = os.path.getsize(
-                DATABASE
-            )
-
-        except Exception:
-
-            size = 0
-
-    finally:
-
-        conn.close()
-
-    size_kb = size / 1024
-
-    await send_message(
-        chat_id(message),
-        (
-            "🗄 <b>DATABASE</b>\n\n"
-            f"📦 File: "
-            f"<code>{html.escape(DATABASE)}</code>\n"
-            f"💾 Size: "
-            f"<code>{size_kb:.2f} KB</code>\n"
-            f"📚 Tables: "
-            f"<code>{len(tables)}</code>\n\n"
-            f"🧩 "
-            f"{html.escape(', '.join(tables))}"
-        )
-    )
-
-
-# ============================================================
-# HEALTH
-# ============================================================
-
-async def command_health(
-    message,
-    args
-):
-
-    start = time.perf_counter()
-
-    telegram = await api(
-        "getMe"
-    )
-
-    elapsed = (
-        time.perf_counter()
-        - start
-    ) * 1000
-
-    db_ok = False
-
-    try:
-
-        row = await adb_execute(
-            "SELECT 1 AS ok",
-            fetchone=True
-        )
-
-        db_ok = (
-            row
-            and row["ok"] == 1
-        )
-
-    except Exception:
-
-        db_ok = False
-
-    telegram_status = (
-        "🟢 OK"
-        if telegram.get("ok")
-        else "🔴 ERROR"
-    )
-
-    database_status = (
-        "🟢 OK"
-        if db_ok
-        else "🔴 ERROR"
-    )
-
-    await send_message(
-        chat_id(message),
-        (
-            "💚 <b>BOT HEALTH</b>\n\n"
-            f"🤖 Telegram API: "
-            f"{telegram_status}\n"
-            f"🗄 Database: "
-            f"{database_status}\n"
-            f"⚡ API latency: "
-            f"<code>{elapsed:.2f} ms</code>\n"
-            f"⏱ Uptime: "
-            f"<code>{get_uptime()}</code>\n"
-            f"📦 Version: "
-            f"<code>{VERSION}</code>"
-        )
-    )
-
-
-# ============================================================
-# VERSION
-# ============================================================
-
-async def command_version(
-    message,
-    args
-):
-
-    await send_message(
-        chat_id(message),
-        (
-            "🤖 <b>THEONE BOT</b>\n\n"
-            f"📦 Version: "
-            f"<code>{VERSION}</code>\n"
-            "🐍 Runtime: "
-            f"<code>Python {sys.version.split()[0]}</code>\n"
-            "🗄 Database: "
-            "<code>SQLite3</code>\n"
-            "🌐 API: "
-            "<code>Telegram Bot API</code>\n"
-            "⚙️ Mode: "
-            "<code>Pure Python</code>"
-        )
-    )
-
-
-# ============================================================
-# REGISTER BOT ADMIN + SYSTEM COMMANDS
-# ============================================================
-
-COMMAND_HANDLERS.update({
-
-    "admins":
-        lambda message, args:
-            command_admins(
-                message,
-                args
-            ),
-
-    "broadcast":
-        lambda message, args:
-            command_broadcast(
-                message,
-                args
-            ),
-
-    "users":
-        lambda message, args:
-            command_users(
-                message,
-                args
-            ),
-
-    "banuser":
-        lambda message, args:
-            command_banuser(
-                message,
-                args
-            ),
-
-    "unbanuser":
-        lambda message, args:
-            command_unbanuser(
-                message,
-                args
-            ),
-
-    "restart":
-        lambda message, args:
-            command_restart(
-                message,
-                args
-            ),
-
-    "logs":
-        lambda message, args:
-            command_logs(
-                message,
-                args
-            ),
-
-    "database":
-        lambda message, args:
-            command_database(
-                message,
-                args
-            ),
-
-    "health":
-        lambda message, args:
-            command_health(
-                message,
-                args
-            ),
-
-    "version":
-        lambda message, args:
-            command_version(
-                message,
-                args
-            ),
-})
-
-
-# ============================================================
-# END PHẦN 5/10
-# ============================================================
-
-# ============================================================
-# THEONE BOT - PURE PYTHON VERSION
-# PHẦN 6/10
-# PROTECTION SYSTEM
-# /antispam /antilink /antibuff /antifake
-# ============================================================
-
-
-# ============================================================
-# PROTECTION CONFIG
-# ============================================================
-
-PROTECTION_KEYS = {
-    "antispam",
-    "antilink",
-    "antibuff",
-    "antifake",
-}
-
-
-# ============================================================
-# TEXT / LINK HELPERS
-# ============================================================
-
-URL_PATTERN = re.compile(
-    r"(https?://|www\.|t\.me/|telegram\.me/)",
-    re.IGNORECASE
-)
-
-USERNAME_PATTERN = re.compile(
-    r"@[A-Za-z0-9_]{4,32}"
-)
-
-
-def message_text(message):
-
-    return (
-        message.get("text")
-        or message.get("caption")
-        or ""
+def normalize_text(text):
+
+    return re.sub(
+        r"\s+",
+        " ",
+        (text or "").strip().lower()
     )
 
 
@@ -6375,1560 +1441,1919 @@ def contains_link(text):
     if not text:
         return False
 
+    patterns = [
+        r"https?://",
+        r"www\.",
+        r"t\.me/",
+        r"telegram\.me/",
+        r"bit\.ly/",
+        r"tinyurl\.com/"
+    ]
+
+    return any(
+        re.search(
+            pattern,
+            text,
+            re.IGNORECASE
+        )
+        for pattern in patterns
+    )
+
+
+def contains_mention(text):
+
+    if not text:
+        return False
+
     return bool(
-        URL_PATTERN.search(
+        re.search(
+            r"@[A-Za-z0-9_]{3,}",
             text
         )
     )
 
 
-# ============================================================
-# ANTISPAM
-# ============================================================
+def clean_username(username):
 
-SPAM_WINDOW = 8
-SPAM_LIMIT = 6
-
-
-async def handle_antispam(
-    message
-):
-
-    if not is_group(message):
-        return False
-
-    chat = chat_id(
-        message
-    )
-
-    if not await get_setting(
-        chat,
-        "antispam",
-        False
-    ):
-        return False
-
-    user = from_user(
-        message
-    )
-
-    if not user:
-        return False
-
-    user_id = user.get(
-        "id"
-    )
-
-    now = time.time()
-
-    key = (
-        chat,
-        user_id
-    )
-
-    queue = SPAM_TRACKER[
-        key
-    ]
-
-    queue.append(
-        now
-    )
-
-    while queue and (
-        now - queue[0]
-        > SPAM_WINDOW
-    ):
-
-        queue.popleft()
-
-    if len(queue) < SPAM_LIMIT:
-        return False
-
-    # Xóa tin nhắn spam hiện tại.
-    deleted = await delete_message(
-        chat,
-        message_id(message)
-    )
-
-    if deleted.get("ok"):
-
-        RUNTIME_STATS[
-            "deleted"
-        ] += 1
-
-    # Reset để không xóa liên tục
-    # mọi tin nhắn sau đó.
-    queue.clear()
-
-    await send_message(
-        chat,
-        (
-            "🛡 <b>ANTISPAM</b>\n\n"
-            f"👤 {mention_user(user)}\n"
-            "⚠️ Phát hiện gửi quá nhiều "
-            "tin nhắn trong thời gian ngắn."
-        )
-    )
-
-    return True
-
-
-# ============================================================
-# ANTILINK
-# ============================================================
-
-async def handle_antilink(
-    message
-):
-
-    if not is_group(message):
-        return False
-
-    chat = chat_id(
-        message
-    )
-
-    if not await get_setting(
-        chat,
-        "antilink",
-        False
-    ):
-        return False
-
-    text = message_text(
-        message
-    )
-
-    if not contains_link(
-        text
-    ):
-        return False
-
-    user = from_user(
-        message
-    )
-
-    # Admin được phép gửi link.
-    if await is_admin(
-        message
-    ):
-        return False
-
-    result = await delete_message(
-        chat,
-        message_id(message)
-    )
-
-    if result.get("ok"):
-
-        RUNTIME_STATS[
-            "deleted"
-        ] += 1
-
-    await send_message(
-        chat,
-        (
-            "🔗 <b>ANTILINK</b>\n\n"
-            f"👤 {mention_user(user)}\n"
-            "🚫 Link đã bị xóa."
-        )
-    )
-
-    return True
-
-
-# ============================================================
-# PROFILE NORMALIZATION
-# Dùng cho antifake
-# ============================================================
-
-UNICODE_CONFUSABLES = str.maketrans({
-    "а": "a",
-    "е": "e",
-    "о": "o",
-    "р": "p",
-    "с": "c",
-    "х": "x",
-    "у": "y",
-    "і": "i",
-    "ј": "j",
-    "Α": "A",
-    "Β": "B",
-    "Ε": "E",
-    "Ι": "I",
-    "Κ": "K",
-    "Μ": "M",
-    "Ν": "N",
-    "Ο": "O",
-    "Ρ": "P",
-    "Τ": "T",
-    "Χ": "X",
-})
-
-
-def normalize_profile_name(
-    text
-):
-
-    if not text:
+    if not username:
         return ""
 
-    text = str(
-        text
-    ).translate(
-        UNICODE_CONFUSABLES
-    )
-
-    text = re.sub(
-        r"[\u200b-\u200f\u202a-\u202e\ufeff]",
-        "",
-        text
-    )
-
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    )
-
-    return text.strip().lower()
-
-
-def profile_display_name(
-    user
-):
-
-    return normalize_profile_name(
-        user_full_name(user)
-    )
+    return username.lstrip(
+        "@"
+    ).strip().lower()
 
 
 # ============================================================
-# SAVE / GET KNOWN PROFILE
+# MODERATION TARGET
 # ============================================================
 
-async def get_known_profile(
-    chat,
-    user_id
-):
-
-    return await adb_execute(
-        """
-        SELECT *
-        FROM known_profiles
-        WHERE chat_id = ?
-        AND user_id = ?
-        """,
-        (
-            chat,
-            user_id
-        ),
-        fetchone=True
-    )
-
-
-async def save_known_profile(
-    chat,
-    user
-):
-
-    if not user:
-        return
-
-    await adb_execute(
-        """
-        INSERT INTO known_profiles
-        (
-            chat_id,
-            user_id,
-            username,
-            display_name,
-            first_seen
-        )
-        VALUES (?, ?, ?, ?, ?)
-
-        ON CONFLICT(chat_id, user_id)
-        DO UPDATE SET
-            username =
-                excluded.username,
-            display_name =
-                excluded.display_name
-        """,
-        (
-            chat,
-            user.get(
-                "username"
-            ),
-            profile_display_name(
-                user
-            ),
-            datetime.now(
-                timezone.utc
-            ).isoformat()
-        )
-    )
-
-
-# ============================================================
-# ANTI-FAKE
-# ============================================================
-
-async def handle_antifake(
-    message
-):
-
-    if not is_group(message):
-        return False
-
-    chat = chat_id(
-        message
-    )
-
-    if not await get_setting(
-        chat,
-        "antifake",
-        False
-    ):
-        return False
-
-    user = from_user(
-        message
-    )
-
-    if not user:
-        return False
-
-    # Bot không xử lý chính nó.
-    if user.get(
-        "is_bot"
-    ):
-        return False
-
-    user_id = user.get(
-        "id"
-    )
-
-    current_name = profile_display_name(
-        user
-    )
-
-    current_username = (
-        user.get(
-            "username"
-        )
-        or ""
-    ).lower()
-
-    known = await get_known_profile(
-        chat,
-        user_id
-    )
-
-    if not known:
-
-        await save_known_profile(
-            chat,
-            user
-        )
-
-        return False
-
-    old_name = normalize_profile_name(
-        known["display_name"]
-        or ""
-    )
-
-    old_username = (
-        known["username"]
-        or ""
-    ).lower()
-
-    suspicious = False
-    reasons = []
-
-    # Username thay đổi.
-    if (
-        old_username
-        and current_username
-        and old_username
-        != current_username
-    ):
-
-        reasons.append(
-            "username thay đổi"
-        )
-
-    # Tên hiển thị thay đổi.
-    if (
-        old_name
-        and current_name
-        and old_name
-        != current_name
-    ):
-
-        reasons.append(
-            "tên hiển thị thay đổi"
-        )
-
-    # Ký tự Unicode bất thường.
-    raw_name = user_full_name(
-        user
-    )
-
-    if re.search(
-        r"[\u200b-\u200f\u202a-\u202e\ufeff]",
-        raw_name
-    ):
-
-        suspicious = True
-
-        reasons.append(
-            "ký tự Unicode ẩn"
-        )
-
-    # Nếu có thay đổi profile nhưng chưa đủ
-    # bằng chứng thì chỉ cảnh báo nhẹ.
-    if reasons:
-
-        suspicious = True
-
-    if suspicious:
-
-        # Cập nhật profile mới nhưng không tự động ban.
-        await save_known_profile(
-            chat,
-            user
-        )
-
-        await send_message(
-            chat,
-            (
-                "🎭 <b>ANTIFAKE CẢNH BÁO</b>\n\n"
-                f"👤 {mention_user(user)}\n"
-                "⚠️ Profile có dấu hiệu thay đổi:\n"
-                + "\n".join(
-                    f"• {html.escape(reason)}"
-                    for reason in reasons
-                )
-                + "\n\n"
-                "ℹ️ Bot chỉ cảnh báo vì thay đổi "
-                "profile không tự nó chứng minh "
-                "tài khoản giả mạo."
-            )
-        )
-
-        return True
-
-    await save_known_profile(
-        chat,
-        user
-    )
-
-    return False
-
-
-# ============================================================
-# ANTIBUFF
-#
-# Phát hiện cụm join bất thường.
-# Không kết luận tài khoản là fake chỉ từ
-# profile; dùng nhiều tín hiệu.
-# ============================================================
-
-JOIN_WINDOW = 60
-JOIN_LIMIT = 8
-
-
-def get_chat_member_count_data(
-    chat
-):
-
-    return None
-
-
-async def handle_chat_member_update(
-    update
-):
-
-    chat_member = update.get(
-        "chat_member"
-    )
-
-    if not chat_member:
-        return
-
-    chat = chat_member.get(
-        "chat",
-        {}
-    )
-
-    chat_type = chat.get(
-        "type"
-    )
-
-    if chat_type not in GROUP_TYPES:
-        return
-
-    chat_value = chat.get(
-        "id"
-    )
-
-    new_member = chat_member.get(
-        "new_chat_member",
-        {}
-    )
-
-    old_member = chat_member.get(
-        "old_chat_member",
-        {}
-    )
-
-    new_status = new_member.get(
-        "status"
-    )
-
-    old_status = old_member.get(
-        "status"
-    )
-
-    # Chỉ xử lý user vừa vào / vừa được thêm.
-    joined = (
-        new_status in {
-            "member",
-            "administrator",
-            "creator"
-        }
-        and old_status in {
-            "left",
-            "kicked"
-        }
-    )
-
-    if not joined:
-        return
-
-    user = new_member.get(
-        "user",
-        {}
-    )
-
-    if not user:
-        return
-
-    RUNTIME_STATS[
-        "joins"
-    ] += 1
-
-    if not await get_setting(
-        chat_value,
-        "antibuff",
-        False
-    ):
-        return
-
-    now = time.time()
-
-    queue = JOIN_TRACKER[
-        chat_value
-    ]
-
-    queue.append(
-        (
-            now,
-            user.get("id")
-        )
-    )
-
-    while queue and (
-        now - queue[0][0]
-        > JOIN_WINDOW
-    ):
-
-        queue.popleft()
-
-    join_count = len(
-        queue
-    )
-
-    # Một cụm join lớn trong thời gian ngắn.
-    if join_count >= JOIN_LIMIT:
-
-        recent_users = [
-            item[1]
-            for item in queue
-        ]
-
-        unique_users = len(
-            set(
-                recent_users
-            )
-        )
-
-        if unique_users >= JOIN_LIMIT:
-
-            # Chỉ cảnh báo admin.
-            # Không tự động ban hàng loạt.
-            await send_message(
-                chat_value,
-                (
-                    "👥 <b>ANTIBUFF CẢNH BÁO</b>\n\n"
-                    f"⚠️ Phát hiện "
-                    f"<code>{unique_users}</code> "
-                    "tài khoản tham gia trong "
-                    f"<code>{JOIN_WINDOW}s</code>.\n\n"
-                    "🔎 Đây là dấu hiệu join bất thường, "
-                    "không phải bằng chứng chắc chắn "
-                    "rằng các tài khoản là fake/buff.\n\n"
-                    "🛡 Hãy kiểm tra danh sách thành viên "
-                    "và hoạt động thực tế trước khi xử lý."
-                )
-            )
-
-            # Reset sau cảnh báo để tránh spam cảnh báo.
-            queue.clear()
-
-
-# ============================================================
-# PROTECTION TOGGLE
-# ============================================================
-
-async def command_protection_toggle(
+def get_target_user(
     message,
-    args,
-    protection_name
+    args=""
 ):
 
-    if not await require_admin(
-        message
-    ):
-        return
-
-    value = args.strip().lower()
-
-    if value not in {
-        "on",
-        "off"
-    }:
-
-        await send_message(
-            chat_id(message),
-            (
-                f"🛡 Dùng:\n"
-                f"<code>/{protection_name} on</code>\n"
-                f"<code>/{protection_name} off</code>"
-            )
-        )
-
-        return
-
-    enabled = (
-        value == "on"
-    )
-
-    await set_setting(
-        chat_id(message),
-        protection_name,
-        enabled
-    )
-
-    status = (
-        "🟢 ON"
-        if enabled
-        else "🔴 OFF"
-    )
-
-    await send_message(
-        chat_id(message),
-        (
-            "🛡 <b>PROTECTION UPDATED</b>\n\n"
-            f"🔧 {html.escape(protection_name)}: "
-            f"<b>{status}</b>"
-        )
-    )
-
-
-async def command_antispam(
-    message,
-    args
-):
-
-    await command_protection_toggle(
-        message,
-        args,
-        "antispam"
-    )
-
-
-async def command_antilink(
-    message,
-    args
-):
-
-    await command_protection_toggle(
-        message,
-        args,
-        "antilink"
-    )
-
-
-async def command_antibuff(
-    message,
-    args
-):
-
-    await command_protection_toggle(
-        message,
-        args,
-        "antibuff"
-    )
-
-
-async def command_antifake(
-    message,
-    args
-):
-
-    await command_protection_toggle(
-        message,
-        args,
-        "antifake"
-    )
-
-
-# ============================================================
-# REGISTER PROTECTION COMMANDS
-# ============================================================
-
-COMMAND_HANDLERS.update({
-
-    "antispam":
-        lambda message, args:
-            command_antispam(
-                message,
-                args
-            ),
-
-    "antilink":
-        lambda message, args:
-            command_antilink(
-                message,
-                args
-            ),
-
-    "antibuff":
-        lambda message, args:
-            command_antibuff(
-                message,
-                args
-            ),
-
-    "antifake":
-        lambda message, args:
-            command_antifake(
-                message,
-                args
-            ),
-})
-
-
-# ============================================================
-# PROTECTION PIPELINE
-# ============================================================
-
-async def run_message_protection(
-    message
-):
-
-    if not is_group(
-        message
-    ):
-        return False
-
-    # Owner / admin không bị antispam,
-    # antilink xử lý.
-    user = from_user(
-        message
-    )
-
-    if user and await is_admin(
-        message
-    ):
-
-        # Vẫn cho antifake kiểm tra profile,
-        # nhưng không chặn.
-        await handle_antifake(
-            message
-        )
-
-        return False
-
-    # AntiSpam
-    if await handle_antispam(
-        message
-    ):
-
-        return True
-
-    # AntiLink
-    if await handle_antilink(
-        message
-    ):
-
-        return True
-
-    # AntiFake
-    if await handle_antifake(
-        message
-    ):
-
-        # Chỉ cảnh báo, không chặn message.
-        return False
-
-    return False
-
-
-# ============================================================
-# UPDATE CHAT MEMBER SUPPORT
-# ============================================================
-
-async def process_chat_member_update(
-    update
-):
-
-    try:
-
-        await handle_chat_member_update(
-            update
-        )
-
-    except Exception as e:
-
-        logger.exception(
-            "Chat member protection error: %s",
-            e
-        )
-
-
-# ============================================================
-# PATCH PROCESS UPDATE
-# để chạy protection trước command
-# ============================================================
-
-_original_process_update = process_update
-
-
-async def process_update(
-    update
-):
-
-    if not isinstance(
-        update,
-        dict
-    ):
-        return
-
-    if update.get(
-        "chat_member"
-    ):
-
-        await process_chat_member_update(
-            update
-        )
-
-        return
-
-    message = (
-        update.get("message")
-        or update.get("edited_message")
-    )
-
-    if not message:
-        return
-
-    user = from_user(
-        message
-    )
-
-    if user:
-        await save_user(
-            user
-        )
-
-    RUNTIME_STATS[
-        "messages"
-    ] += 1
-
-    if is_group(
-        message
-    ):
-
-        RUNTIME_STATS[
-            "groups"
-        ] += 1
-
-    elif is_private(
-        message
-    ):
-
-        RUNTIME_STATS[
-            "private"
-        ] += 1
-
-    if user and await is_bot_banned(
-        user.get("id")
-    ):
-
-        if not is_owner(
-            user
-        ):
-
-            return
-
-    # Protection chạy trước command.
-    blocked = await run_message_protection(
-        message
-    )
-
-    if blocked:
-        return
-
-    await dispatch_command(
-        message
-    )
-
-
-# ============================================================
-# END PHẦN 6/10
-# ============================================================
-
-# ============================================================
-# THEONE BOT - PURE PYTHON VERSION
-# PHẦN 7/10
-# AFK + FILTER SYSTEM
-# /afk /filter /filters /stopfilter
-# ============================================================
-
-
-# ============================================================
-# AFK HELPERS
-# ============================================================
-
-async def set_afk(
-    user_id,
-    reason
-):
-
-    if not reason:
-        reason = "Không có lý do"
-
-    now = datetime.now(
-        timezone.utc
-    ).isoformat()
-
-    await adb_execute(
-        """
-        INSERT INTO afk
-        (
-            user_id,
-            reason,
-            created_at
-        )
-        VALUES (?, ?, ?)
-
-        ON CONFLICT(user_id)
-        DO UPDATE SET
-            reason = excluded.reason,
-            created_at = excluded.created_at
-        """,
-        (
-            user_id,
-            reason,
-            now
-        )
-    )
-
-    AFK_CACHE[
-        user_id
-    ] = {
-        "reason": reason,
-        "created_at": now
-    }
-
-
-async def get_afk(
-    user_id
-):
-
-    cached = AFK_CACHE.get(
-        user_id
-    )
-
-    if cached:
-        return cached
-
-    row = await adb_execute(
-        """
-        SELECT
-            user_id,
-            reason,
-            created_at
-        FROM afk
-        WHERE user_id = ?
-        """,
-        (
-            user_id,
-        ),
-        fetchone=True
-    )
-
-    if not row:
-        return None
-
-    data = {
-        "reason": row["reason"],
-        "created_at": row["created_at"]
-    }
-
-    AFK_CACHE[
-        user_id
-    ] = data
-
-    return data
-
-
-async def clear_afk(
-    user_id
-):
-
-    await adb_execute(
-        """
-        DELETE FROM afk
-        WHERE user_id = ?
-        """,
-        (
-            user_id,
-        )
-    )
-
-    AFK_CACHE.pop(
-        user_id,
-        None
-    )
-
-
-def format_afk_time(
-    created_at
-):
-
-    try:
-
-        created = datetime.fromisoformat(
-            created_at
-        )
-
-        if created.tzinfo is None:
-
-            created = created.replace(
-                tzinfo=timezone.utc
-            )
-
-        elapsed = (
-            datetime.now(
-                timezone.utc
-            )
-            - created
-        ).total_seconds()
-
-        elapsed = max(
-            0,
-            int(elapsed)
-        )
-
-        return format_duration(
-            elapsed
-        )
-
-    except Exception:
-
-        return "một lúc"
-
-
-# ============================================================
-# /AFK
-# ============================================================
-
-async def command_afk(
-    message,
-    args
-):
-
-    user = from_user(
-        message
-    )
-
-    if not user:
-        return
-
-    reason = (
-        args.strip()
-        if args.strip()
-        else "Không có lý do"
-    )
-
-    await set_afk(
-        user.get("id"),
-        reason
-    )
-
-    await send_message(
-        chat_id(message),
-        (
-            "💤 <b>ĐÃ BẬT AFK</b>\n\n"
-            f"👤 {mention_user(user)}\n"
-            f"📝 Lý do: "
-            f"{html.escape(reason)}\n\n"
-            "💬 Khi bạn gửi tin nhắn mới, "
-            "AFK sẽ tự động tắt."
-        )
-    )
-
-
-# ============================================================
-# EXTRACT MENTIONED USERS
-# ============================================================
-
-def mentioned_user_ids(
-    message
-):
-
-    entities = (
-        message.get(
-            "entities"
-        )
-        or []
-    )
-
-    text = message.get(
-        "text"
-        or ""
-    )
-
-    result = []
-
-    for entity in entities:
-
-        if entity.get(
-            "type"
-        ) == "text_mention":
-
-            user = entity.get(
-                "user"
-            )
-
-            if user and user.get(
-                "id"
-            ):
-
-                result.append(
-                    user.get("id")
-                )
-
-    # Telegram có entity "mention" nhưng không
-    # cung cấp user ID trực tiếp. Không tự đoán ID.
-    return result
-
-
-async def find_afk_targets(
-    message
-):
-
-    targets = set()
-
-    reply = message.get(
+    reply = (
+        message or {}
+    ).get(
         "reply_to_message"
     )
 
     if reply:
 
-        reply_user = reply.get(
+        target = reply.get(
             "from"
         )
 
-        if reply_user and reply_user.get(
-            "id"
-        ):
+        if target:
+            return target
 
-            targets.add(
-                reply_user.get("id")
+    args = (
+        args or ""
+    ).strip()
+
+    if not args:
+        return None
+
+    token = args.split(
+        maxsplit=1
+    )[0]
+
+    if token.startswith("@"):
+
+        return {
+            "username":
+                clean_username(token)
+        }
+
+    if token.isdigit():
+
+        return {
+            "id": int(token)
+        }
+
+    return None
+
+
+async def resolve_target_id(
+    message,
+    target
+):
+
+    if not target:
+        return None
+
+    if target.get("id"):
+
+        return int(
+            target["id"]
+        )
+
+    username = clean_username(
+        target.get(
+            "username",
+            ""
+        )
+    )
+
+    if not username:
+        return None
+
+    # Telegram Bot API không có
+    # getUserByUsername trực tiếp.
+    # Ưu tiên reply hoặc ID.
+    return None
+
+# ============================================================
+# PHẦN 3/15 — MODERATION
+# ============================================================
+
+def tg_username(user):
+    if not user:
+        return "người dùng"
+    if user.get("username"):
+        return "@" + user["username"]
+    name = user.get("first_name") or user.get("last_name") or "người dùng"
+    return name
+
+
+def mention_user(user):
+    if not user:
+        return "người dùng"
+
+    name = (
+        user.get("first_name")
+        or user.get("last_name")
+        or user.get("username")
+        or "người dùng"
+    )
+
+    uid = user.get("id")
+    return f'<a href="tg://user?id={uid}">{html.escape(name)}</a>'
+
+
+def get_reply_user(message):
+    reply = message.get("reply_to_message")
+    if reply:
+        return reply.get("from")
+    return None
+
+
+def resolve_target(message, args):
+    """
+    Ưu tiên:
+    1. Reply tin nhắn
+    2. ID
+    3. @username
+    """
+
+    reply_user = get_reply_user(message)
+    if reply_user:
+        return reply_user
+
+    if not args:
+        return None
+
+    target = args[0].strip()
+
+    # ID Telegram
+    if target.isdigit():
+        try:
+            uid = int(target)
+            return {
+                "id": uid,
+                "first_name": str(uid),
+                "username": None
+            }
+        except Exception:
+            return None
+
+    # @username
+    if target.startswith("@"):
+        username = target[1:].lower()
+
+        try:
+            row = db_fetchone(
+                "SELECT user_id, first_name, username "
+                "FROM known_profiles WHERE lower(username)=?",
+                (username,)
             )
 
-    for user_id in mentioned_user_ids(
-        message
-    ):
+            if row:
+                return {
+                    "id": row["user_id"],
+                    "first_name": row["first_name"] or username,
+                    "username": row["username"]
+                }
+        except Exception:
+            pass
 
-        targets.add(
-            user_id
-        )
+        # Telegram Bot API không cho bot tự lấy user theo username
+        # nếu chưa từng biết user đó.
+        return {
+            "id": None,
+            "first_name": username,
+            "username": username
+        }
 
-    return list(
-        targets
-    )
+    return None
 
 
-# ============================================================
-# HANDLE AFK NOTIFICATIONS
-# ============================================================
+def save_known_profile(user):
+    if not user or not user.get("id"):
+        return
 
-async def handle_afk_notification(
-    message
-):
-
-    targets = await find_afk_targets(
-        message
-    )
-
-    if not targets:
-        return False
-
-    notified = False
-
-    for user_id in targets:
-
-        data = await get_afk(
-            user_id
-        )
-
-        if not data:
-            continue
-
-        row = await adb_execute(
+    try:
+        db_execute(
             """
-            SELECT
-                first_name,
-                last_name,
-                username
-            FROM users
-            WHERE user_id = ?
+            INSERT INTO known_profiles
+            (user_id, first_name, username)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id)
+            DO UPDATE SET
+                first_name=excluded.first_name,
+                username=excluded.username
             """,
             (
-                user_id,
-            ),
-            fetchone=True
+                user["id"],
+                user.get("first_name"),
+                user.get("username")
+            )
         )
+    except Exception:
+        pass
 
-        if row:
 
-            fake_user = {
-                "id":
-                    user_id,
+def is_bot_user(user):
+    return bool(user and user.get("is_bot"))
 
-                "first_name":
-                    row["first_name"]
-                    or "User",
 
-                "last_name":
-                    row["last_name"]
-                    or "",
+def is_self_target(user):
+    if not user:
+        return False
 
-                "username":
-                    row["username"]
+    try:
+        me = tg_call("getMe", {})
+        if me.get("ok"):
+            return user.get("id") == me["result"].get("id")
+    except Exception:
+        pass
+
+    return False
+
+
+def can_target_member(chat_id, target_id):
+    if not target_id:
+        return False
+
+    try:
+        result = tg_call(
+            "getChatMember",
+            {
+                "chat_id": chat_id,
+                "user_id": target_id
             }
-
-        else:
-
-            fake_user = {
-                "id":
-                    user_id,
-
-                "first_name":
-                    "User"
-            }
-
-        elapsed = format_afk_time(
-            data["created_at"]
         )
 
-        await send_message(
-            chat_id(message),
-            (
-                "💤 <b>NGƯỜI DÙNG ĐANG AFK</b>\n\n"
-                f"👤 {mention_user(fake_user)}\n"
-                f"📝 Lý do: "
-                f"{html.escape(data['reason'])}\n"
-                f"⏱ AFK: "
-                f"<code>{elapsed}</code>"
-            ),
-            reply_to=message_id(message)
-        )
+        if not result.get("ok"):
+            return False
 
-        RUNTIME_STATS[
-            "afk_notifications"
-        ] += 1
+        status = result["result"].get("status")
 
-        notified = True
+        # Không xử lý owner/admin bằng các lệnh member thường
+        if status in ("creator", "administrator"):
+            return False
 
-    return notified
+        return status in ("member", "restricted")
+    except Exception:
+        return False
 
 
-# ============================================================
-# CLEAR AFK WHEN USER RETURNS
-# ============================================================
+def target_id_from_args(message, args):
+    target = resolve_target(message, args)
 
-async def handle_afk_return(
-    message
-):
+    if not target:
+        return None
 
-    user = from_user(
-        message
+    return target.get("id")
+
+
+def target_display(target):
+    if not target:
+        return "người dùng"
+
+    if target.get("username"):
+        return "@" + target["username"]
+
+    return html.escape(
+        target.get("first_name") or "người dùng"
     )
+
+
+# ------------------------------------------------------------
+# BAN
+# ------------------------------------------------------------
+
+def cmd_ban(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    target = resolve_target(message, args)
+
+    if not target or not target.get("id"):
+        return send_text(
+            chat_id,
+            "❌ Hãy reply tin nhắn người cần ban hoặc dùng:\n"
+            "/ban ID\n"
+            "/ban @username"
+        )
+
+    uid = target["id"]
+
+    if uid == message["from"]["id"]:
+        return send_text(chat_id, "❌ Không thể tự ban chính mình.")
+
+    if not can_target_member(chat_id, uid):
+        return send_text(
+            chat_id,
+            "❌ Không thể ban người này."
+        )
+
+    result = tg_call(
+        "banChatMember",
+        {
+            "chat_id": chat_id,
+            "user_id": uid
+        }
+    )
+
+    if result.get("ok"):
+        send_text(
+            chat_id,
+            f"🔨 Đã ban {target_display(target)}.",
+            parse_mode="HTML"
+        )
+    else:
+        send_text(
+            chat_id,
+            "❌ Ban thất bại. Kiểm tra quyền admin của bot."
+        )
+
+
+# ------------------------------------------------------------
+# UNBAN
+# ------------------------------------------------------------
+
+def cmd_unban(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    target = resolve_target(message, args)
+
+    if not target or not target.get("id"):
+        return send_text(
+            chat_id,
+            "❌ Dùng /unban ID hoặc reply tin nhắn."
+        )
+
+    result = tg_call(
+        "unbanChatMember",
+        {
+            "chat_id": chat_id,
+            "user_id": target["id"],
+            "only_if_banned": True
+        }
+    )
+
+    if result.get("ok"):
+        send_text(
+            chat_id,
+            f"✅ Đã unban {target_display(target)}.",
+            parse_mode="HTML"
+        )
+    else:
+        send_text(
+            chat_id,
+            "❌ Unban thất bại."
+        )
+
+
+# ------------------------------------------------------------
+# KICK
+# ------------------------------------------------------------
+
+def cmd_kick(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    target = resolve_target(message, args)
+
+    if not target or not target.get("id"):
+        return send_text(
+            chat_id,
+            "❌ Reply người cần kick hoặc dùng /kick ID."
+        )
+
+    uid = target["id"]
+
+    if not can_target_member(chat_id, uid):
+        return send_text(
+            chat_id,
+            "❌ Không thể kick người này."
+        )
+
+    # Kick = ban rồi unban
+    result1 = tg_call(
+        "banChatMember",
+        {
+            "chat_id": chat_id,
+            "user_id": uid
+        }
+    )
+
+    if not result1.get("ok"):
+        return send_text(
+            chat_id,
+            "❌ Kick thất bại."
+        )
+
+    tg_call(
+        "unbanChatMember",
+        {
+            "chat_id": chat_id,
+            "user_id": uid,
+            "only_if_banned": True
+        }
+    )
+
+    send_text(
+        chat_id,
+        f"👢 Đã kick {target_display(target)}.",
+        parse_mode="HTML"
+    )
+
+
+# ------------------------------------------------------------
+# MUTE
+# ------------------------------------------------------------
+
+def cmd_mute(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    target = resolve_target(message, args)
+
+    if not target or not target.get("id"):
+        return send_text(
+            chat_id,
+            "❌ Reply người cần mute hoặc dùng /mute ID."
+        )
+
+    uid = target["id"]
+
+    if not can_target_member(chat_id, uid):
+        return send_text(
+            chat_id,
+            "❌ Không thể mute người này."
+        )
+
+    result = tg_call(
+        "restrictChatMember",
+        {
+            "chat_id": chat_id,
+            "user_id": uid,
+            "permissions": {
+                "can_send_messages": False,
+                "can_send_audios": False,
+                "can_send_documents": False,
+                "can_send_photos": False,
+                "can_send_videos": False,
+                "can_send_video_notes": False,
+                "can_send_voice_notes": False,
+                "can_send_polls": False,
+                "can_send_other_messages": False,
+                "can_add_web_page_previews": False
+            }
+        }
+    )
+
+    if result.get("ok"):
+        send_text(
+            chat_id,
+            f"🔇 Đã mute {target_display(target)}.",
+            parse_mode="HTML"
+        )
+    else:
+        send_text(
+            chat_id,
+            "❌ Mute thất bại. Bot cần quyền quản trị."
+        )
+
+
+# ------------------------------------------------------------
+# UNMUTE
+# ------------------------------------------------------------
+
+def cmd_unmute(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    target = resolve_target(message, args)
+
+    if not target or not target.get("id"):
+        return send_text(
+            chat_id,
+            "❌ Reply người cần unmute hoặc dùng /unmute ID."
+        )
+
+    uid = target["id"]
+
+    result = tg_call(
+        "restrictChatMember",
+        {
+            "chat_id": chat_id,
+            "user_id": uid,
+            "permissions": {
+                "can_send_messages": True,
+                "can_send_audios": True,
+                "can_send_documents": True,
+                "can_send_photos": True,
+                "can_send_videos": True,
+                "can_send_video_notes": True,
+                "can_send_voice_notes": True,
+                "can_send_polls": True,
+                "can_send_other_messages": True,
+                "can_add_web_page_previews": True
+            }
+        }
+    )
+
+    if result.get("ok"):
+        send_text(
+            chat_id,
+            f"🔊 Đã unmute {target_display(target)}.",
+            parse_mode="HTML"
+        )
+    else:
+        send_text(
+            chat_id,
+            "❌ Unmute thất bại."
+        )
+
+
+# ------------------------------------------------------------
+# WARN
+# ------------------------------------------------------------
+
+def get_warn_count(chat_id, user_id):
+    row = db_fetchone(
+        "SELECT count FROM warns WHERE chat_id=? AND user_id=?",
+        (chat_id, user_id)
+    )
+
+    if not row:
+        return 0
+
+    return int(row["count"] or 0)
+
+
+def set_warn_count(chat_id, user_id, count):
+    db_execute(
+        """
+        INSERT INTO warns(chat_id,user_id,count)
+        VALUES(?,?,?)
+        ON CONFLICT(chat_id,user_id)
+        DO UPDATE SET count=excluded.count
+        """,
+        (chat_id, user_id, count)
+    )
+
+
+def cmd_warn(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    target = resolve_target(message, args)
+
+    if not target or not target.get("id"):
+        return send_text(
+            chat_id,
+            "⚠️ Dùng /warn bằng cách reply tin nhắn người cần cảnh cáo."
+        )
+
+    uid = target["id"]
+
+    if not can_target_member(chat_id, uid):
+        return send_text(
+            chat_id,
+            "❌ Không thể warn người này."
+        )
+
+    count = get_warn_count(chat_id, uid) + 1
+    set_warn_count(chat_id, uid, count)
+
+    if count >= 3:
+        # Đủ 3 warn -> mute
+        tg_call(
+            "restrictChatMember",
+            {
+                "chat_id": chat_id,
+                "user_id": uid,
+                "permissions": {
+                    "can_send_messages": False,
+                    "can_send_audios": False,
+                    "can_send_documents": False,
+                    "can_send_photos": False,
+                    "can_send_videos": False,
+                    "can_send_video_notes": False,
+                    "can_send_voice_notes": False,
+                    "can_send_polls": False,
+                    "can_send_other_messages": False,
+                    "can_add_web_page_previews": False
+                }
+            }
+        )
+
+        send_text(
+            chat_id,
+            f"⚠️ {target_display(target)} đã nhận {count} cảnh cáo.\n"
+            f"🔇 Đã tự động mute vì đủ 3 cảnh cáo.",
+            parse_mode="HTML"
+        )
+        return
+
+    send_text(
+        chat_id,
+        f"⚠️ {target_display(target)} nhận cảnh cáo.\n"
+        f"📌 Warn: {count}/3",
+        parse_mode="HTML"
+    )
+
+
+# ------------------------------------------------------------
+# UNWARN
+# ------------------------------------------------------------
+
+def cmd_unwarn(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    target = resolve_target(message, args)
+
+    if not target or not target.get("id"):
+        return send_text(
+            chat_id,
+            "❌ Reply người cần unwarn."
+        )
+
+    uid = target["id"]
+
+    count = max(0, get_warn_count(chat_id, uid) - 1)
+    set_warn_count(chat_id, uid, count)
+
+    send_text(
+        chat_id,
+        f"✅ Đã giảm warn cho {target_display(target)}.\n"
+        f"📌 Warn hiện tại: {count}/3",
+        parse_mode="HTML"
+    )
+
+
+# ------------------------------------------------------------
+# PROMOTE
+# ------------------------------------------------------------
+
+def cmd_promote(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    target = resolve_target(message, args)
+
+    if not target or not target.get("id"):
+        return send_text(
+            chat_id,
+            "❌ Reply người cần promote."
+        )
+
+    result = tg_call(
+        "promoteChatMember",
+        {
+            "chat_id": chat_id,
+            "user_id": target["id"],
+            "can_manage_chat": True,
+            "can_delete_messages": True,
+            "can_manage_video_chats": True,
+            "can_restrict_members": True,
+            "can_promote_members": False,
+            "can_change_info": True,
+            "can_invite_users": True,
+            "can_pin_messages": True
+        }
+    )
+
+    if result.get("ok"):
+        send_text(
+            chat_id,
+            f"👑 Đã promote {target_display(target)}.",
+            parse_mode="HTML"
+        )
+    else:
+        send_text(
+            chat_id,
+            "❌ Promote thất bại."
+        )
+
+
+# ------------------------------------------------------------
+# DEMOTE
+# ------------------------------------------------------------
+
+def cmd_demote(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    target = resolve_target(message, args)
+
+    if not target or not target.get("id"):
+        return send_text(
+            chat_id,
+            "❌ Reply admin cần hạ quyền."
+        )
+
+    result = tg_call(
+        "promoteChatMember",
+        {
+            "chat_id": chat_id,
+            "user_id": target["id"],
+            "can_manage_chat": False,
+            "can_delete_messages": False,
+            "can_manage_video_chats": False,
+            "can_restrict_members": False,
+            "can_promote_members": False,
+            "can_change_info": False,
+            "can_invite_users": False,
+            "can_pin_messages": False
+        }
+    )
+
+    if result.get("ok"):
+        send_text(
+            chat_id,
+            f"⬇️ Đã demote {target_display(target)}.",
+            parse_mode="HTML"
+        )
+    else:
+        send_text(
+            chat_id,
+            "❌ Demote thất bại."
+        )
+
+
+# ------------------------------------------------------------
+# PIN
+# ------------------------------------------------------------
+
+def cmd_pin(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    reply = message.get("reply_to_message")
+
+    if not reply:
+        return send_text(
+            chat_id,
+            "📌 Hãy reply tin nhắn cần ghim rồi dùng /pin."
+        )
+
+    result = tg_call(
+        "pinChatMessage",
+        {
+            "chat_id": chat_id,
+            "message_id": reply["message_id"],
+            "disable_notification": False
+        }
+    )
+
+    if result.get("ok"):
+        send_text(chat_id, "📌 Đã ghim tin nhắn.")
+    else:
+        send_text(
+            chat_id,
+            "❌ Không thể ghim tin nhắn."
+        )
+
+
+# ------------------------------------------------------------
+# UNPIN
+# ------------------------------------------------------------
+
+def cmd_unpin(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+
+    reply = message.get("reply_to_message")
+
+    if reply:
+        result = tg_call(
+            "unpinChatMessage",
+            {
+                "chat_id": chat_id,
+                "message_id": reply["message_id"]
+            }
+        )
+    else:
+        result = tg_call(
+            "unpinChatMessage",
+            {
+                "chat_id": chat_id
+            }
+        )
+
+    if result.get("ok"):
+        send_text(chat_id, "📍 Đã bỏ ghim tin nhắn.")
+    else:
+        send_text(
+            chat_id,
+            "❌ Không thể bỏ ghim."
+        )
+
+# ============================================================
+# PHẦN 4/15 — BẢO VỆ NHÓM
+# ANTISPAM / ANTILINK / ANTIBUFF / ANTIFAKE
+# ============================================================
+
+# ------------------------------------------------------------
+# BIẾN ANTISPAM
+# ------------------------------------------------------------
+
+SPAM_TRACKER = {}
+
+# Số tin nhắn tối đa trong khoảng thời gian
+SPAM_LIMIT = 7
+SPAM_WINDOW = 8
+
+
+def check_antispam(chat_id, user_id):
+    """
+    Trả về True nếu user đang spam.
+    """
+
+    now = time.time()
+
+    key = (chat_id, user_id)
+
+    if key not in SPAM_TRACKER:
+        SPAM_TRACKER[key] = []
+
+    # Chỉ giữ lại tin nhắn trong khoảng SPAM_WINDOW giây
+    SPAM_TRACKER[key] = [
+        t for t in SPAM_TRACKER[key]
+        if now - t <= SPAM_WINDOW
+    ]
+
+    SPAM_TRACKER[key].append(now)
+
+    return len(SPAM_TRACKER[key]) >= SPAM_LIMIT
+
+
+def clear_spam_user(chat_id, user_id):
+    SPAM_TRACKER.pop((chat_id, user_id), None)
+
+
+# ------------------------------------------------------------
+# XÓA TIN NHẮN
+# ------------------------------------------------------------
+
+def delete_message(chat_id, message_id):
+    try:
+        result = tg_call(
+            "deleteMessage",
+            {
+                "chat_id": chat_id,
+                "message_id": message_id
+            }
+        )
+        return bool(result.get("ok"))
+    except Exception:
+        return False
+
+
+# ------------------------------------------------------------
+# ANTISPAM
+# ------------------------------------------------------------
+
+def cmd_antispam(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được bật/tắt Antispam."
+        )
+
+    action = args[0].lower() if args else ""
+
+    if action in ("on", "bat", "bật", "1"):
+        set_setting(chat_id, "antispam", "1")
+        return send_text(
+            chat_id,
+            "🛡️ Antispam đã được BẬT."
+        )
+
+    if action in ("off", "tat", "tắt", "0"):
+        set_setting(chat_id, "antispam", "0")
+        return send_text(
+            chat_id,
+            "🛡️ Antispam đã được TẮT."
+        )
+
+    status = get_setting(chat_id, "antispam", "0")
+
+    send_text(
+        chat_id,
+        "🛡️ ANTISPAM\n\n"
+        f"Trạng thái: {'🟢 BẬT' if status == '1' else '🔴 TẮT'}\n\n"
+        "Cách dùng:\n"
+        "/antispam on\n"
+        "/antispam off"
+    )
+
+
+# ------------------------------------------------------------
+# XỬ LÝ ANTISPAM
+# ------------------------------------------------------------
+
+def handle_antispam_message(message):
+    chat = message.get("chat", {})
+
+    if not is_group_chat(chat):
+        return False
+
+    chat_id = chat.get("id")
+    user = message.get("from", {})
 
     if not user:
         return False
 
-    user_id = user.get(
-        "id"
-    )
-
-    data = await get_afk(
-        user_id
-    )
-
-    if not data:
+    # Admin không bị antispam
+    if is_admin(chat_id, user.get("id")):
         return False
 
-    elapsed = format_afk_time(
-        data["created_at"]
+    if get_setting(chat_id, "antispam", "0") != "1":
+        return False
+
+    if check_antispam(chat_id, user.get("id")):
+        delete_message(
+            chat_id,
+            message.get("message_id")
+        )
+
+        clear_spam_user(
+            chat_id,
+            user.get("id")
+        )
+
+        send_text(
+            chat_id,
+            f"🚫 {mention_user(user)} đang gửi tin nhắn quá nhanh.\n"
+            "🛡️ Antispam đã chặn.",
+            parse_mode="HTML"
+        )
+
+        return True
+
+    return False
+
+
+# ------------------------------------------------------------
+# ANTILINK
+# ------------------------------------------------------------
+
+LINK_REGEX = re.compile(
+    r"(https?://\S+|www\.\S+|t\.me/\S+|telegram\.me/\S+)",
+    re.IGNORECASE
+)
+
+
+def contains_link(text):
+    if not text:
+        return False
+
+    return bool(LINK_REGEX.search(text))
+
+
+def cmd_antilink(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được bật/tắt Antilink."
+        )
+
+    action = args[0].lower() if args else ""
+
+    if action in ("on", "bat", "bật", "1"):
+        set_setting(chat_id, "antilink", "1")
+        return send_text(
+            chat_id,
+            "🔗 Antilink đã được BẬT."
+        )
+
+    if action in ("off", "tat", "tắt", "0"):
+        set_setting(chat_id, "antilink", "0")
+        return send_text(
+            chat_id,
+            "🔗 Antilink đã được TẮT."
+        )
+
+    status = get_setting(chat_id, "antilink", "0")
+
+    send_text(
+        chat_id,
+        "🔗 ANTILINK\n\n"
+        f"Trạng thái: {'🟢 BẬT' if status == '1' else '🔴 TẮT'}\n\n"
+        "Cách dùng:\n"
+        "/antilink on\n"
+        "/antilink off"
     )
 
-    await clear_afk(
+
+def handle_antilink_message(message):
+    chat = message.get("chat", {})
+
+    if not is_group_chat(chat):
+        return False
+
+    chat_id = chat.get("id")
+    user = message.get("from", {})
+
+    if not user:
+        return False
+
+    if is_admin(chat_id, user.get("id")):
+        return False
+
+    if get_setting(chat_id, "antilink", "0") != "1":
+        return False
+
+    text = (
+        message.get("text")
+        or message.get("caption")
+        or ""
+    )
+
+    if not contains_link(text):
+        return False
+
+    deleted = delete_message(
+        chat_id,
+        message.get("message_id")
+    )
+
+    if deleted:
+        send_text(
+            chat_id,
+            f"🔗 {mention_user(user)}, nhóm đang bật Antilink.\n"
+            "❌ Tin nhắn chứa link đã bị xóa.",
+            parse_mode="HTML"
+        )
+
+    return True
+
+
+# ------------------------------------------------------------
+# ANTIBUFF
+# ------------------------------------------------------------
+
+def get_group_member_count(chat_id):
+    try:
+        result = tg_call(
+            "getChatMemberCount",
+            {
+                "chat_id": chat_id
+            }
+        )
+
+        if result.get("ok"):
+            return int(result["result"])
+
+    except Exception:
+        pass
+
+    return 0
+
+
+def get_recent_joiners(chat_id, hours=24):
+    """
+    Lấy danh sách user mà bot đã ghi nhận qua các message/service update.
+    """
+
+    cutoff = int(time.time()) - hours * 3600
+
+    rows = db_fetchall(
+        """
+        SELECT user_id, first_name, username
+        FROM users
+        WHERE chat_id=?
+        AND last_seen>=?
+        """,
+        (chat_id, cutoff)
+    )
+
+    return rows
+
+
+def cmd_antibuff(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được bật/tắt Antibuff."
+        )
+
+    action = args[0].lower() if args else ""
+
+    if action in ("on", "bat", "bật", "1"):
+        set_setting(chat_id, "antibuff", "1")
+        return send_text(
+            chat_id,
+            "👥 Antibuff đã được BẬT."
+        )
+
+    if action in ("off", "tat", "tắt", "0"):
+        set_setting(chat_id, "antibuff", "0")
+        return send_text(
+            chat_id,
+            "👥 Antibuff đã được TẮT."
+        )
+
+    status = get_setting(chat_id, "antibuff", "0")
+
+    send_text(
+        chat_id,
+        "👥 ANTIBUFF\n\n"
+        f"Trạng thái: {'🟢 BẬT' if status == '1' else '🔴 TẮT'}\n\n"
+        "Antibuff giúp theo dõi tài khoản mới xuất hiện trong nhóm "
+        "và hạn chế hành vi tăng thành viên bất thường.\n\n"
+        "Cách dùng:\n"
+        "/antibuff on\n"
+        "/antibuff off"
+    )
+
+
+def handle_antibuff_message(message):
+    """
+    Antibuff không tự động ban hàng loạt.
+    Nó chỉ ghi nhận profile để tránh nhận diện sai người dùng thật.
+    """
+
+    chat = message.get("chat", {})
+
+    if not is_group_chat(chat):
+        return False
+
+    chat_id = chat.get("id")
+    user = message.get("from", {})
+
+    if not user or not user.get("id"):
+        return False
+
+    if get_setting(chat_id, "antibuff", "0") != "1":
+        return False
+
+    save_known_profile(user)
+
+    # Ghi nhận người dùng đã xuất hiện trong nhóm.
+    db_execute(
+        """
+        INSERT INTO users
+        (chat_id, user_id, first_name, username, last_seen)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(chat_id,user_id)
+        DO UPDATE SET
+            first_name=excluded.first_name,
+            username=excluded.username,
+            last_seen=excluded.last_seen
+        """,
+        (
+            chat_id,
+            user["id"],
+            user.get("first_name"),
+            user.get("username"),
+            int(time.time())
+        )
+    )
+
+    return False
+
+
+# ------------------------------------------------------------
+# ANTIFAKE
+# ------------------------------------------------------------
+
+def profile_signature(user):
+    """
+    Tạo chữ ký đơn giản dựa trên tên + username.
+    Không dùng để kết luận người dùng là lừa đảo.
+    """
+
+    if not user:
+        return ""
+
+    name = (
+        user.get("first_name")
+        or ""
+    ).strip().lower()
+
+    last = (
+        user.get("last_name")
+        or ""
+    ).strip().lower()
+
+    username = (
+        user.get("username")
+        or ""
+    ).strip().lower()
+
+    return f"{name}|{last}|{username}"
+
+
+def cmd_antifake(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được bật/tắt Antifake."
+        )
+
+    action = args[0].lower() if args else ""
+
+    if action in ("on", "bat", "bật", "1"):
+        set_setting(chat_id, "antifake", "1")
+        return send_text(
+            chat_id,
+            "🕵️ Antifake đã được BẬT."
+        )
+
+    if action in ("off", "tat", "tắt", "0"):
+        set_setting(chat_id, "antifake", "0")
+        return send_text(
+            chat_id,
+            "🕵️ Antifake đã được TẮT."
+        )
+
+    status = get_setting(chat_id, "antifake", "0")
+
+    send_text(
+        chat_id,
+        "🕵️ ANTIFAKE\n\n"
+        f"Trạng thái: {'🟢 BẬT' if status == '1' else '🔴 TẮT'}\n\n"
+        "Bot sẽ lưu profile đã quan sát trong nhóm để phát hiện "
+        "những trường hợp có tên hiển thị giống nhau.\n\n"
+        "Cách dùng:\n"
+        "/antifake on\n"
+        "/antifake off"
+    )
+
+
+def handle_antifake_message(message):
+    chat = message.get("chat", {})
+
+    if not is_group_chat(chat):
+        return False
+
+    chat_id = chat.get("id")
+    user = message.get("from", {})
+
+    if not user or not user.get("id"):
+        return False
+
+    if get_setting(chat_id, "antifake", "0") != "1":
+        return False
+
+    current_name = (
+        user.get("first_name")
+        or ""
+    ).strip().lower()
+
+    current_last = (
+        user.get("last_name")
+        or ""
+    ).strip().lower()
+
+    if not current_name:
+        return False
+
+    # Tìm người khác có cùng tên hiển thị.
+    rows = db_fetchall(
+        """
+        SELECT user_id, first_name, last_name, username
+        FROM known_profiles
+        WHERE user_id != ?
+        """,
+        (user["id"],)
+    )
+
+    possible = []
+
+    for row in rows:
+        old_name = (
+            row["first_name"]
+            or ""
+        ).strip().lower()
+
+        old_last = (
+            row["last_name"]
+            or ""
+        ).strip().lower()
+
+        if old_name == current_name and old_last == current_last:
+            possible.append(row)
+
+    save_known_profile(user)
+
+    # Chỉ cảnh báo, không tự động ban.
+    if possible:
+        username = user.get("username")
+
+        # Có username khác nhau thì mới đáng chú ý.
+        for row in possible:
+            old_username = row["username"]
+
+            if (
+                old_username
+                and username
+                and old_username.lower() != username.lower()
+            ):
+                send_text(
+                    chat_id,
+                    "⚠️ <b>CẢNH BÁO ANTIFAKE</b>\n\n"
+                    f"Phát hiện tài khoản {mention_user(user)} "
+                    "có tên hiển thị giống một tài khoản khác trong "
+                    "danh sách đã ghi nhận.\n\n"
+                    "🔎 Hãy kiểm tra kỹ @username và ID trước khi "
+                    "giao dịch hoặc cung cấp thông tin.",
+                    parse_mode="HTML"
+                )
+                break
+
+    return False
+
+
+# ------------------------------------------------------------
+# TRẠNG THÁI BẢO VỆ
+# ------------------------------------------------------------
+
+def cmd_protect(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được xem cấu hình bảo vệ."
+        )
+
+    send_text(
+        chat_id,
+        "🛡️ <b>BẢO VỆ NHÓM</b>\n\n"
+        f"🚫 Antispam: "
+        f"{'🟢 BẬT' if get_setting(chat_id, 'antispam', '0') == '1' else '🔴 TẮT'}\n"
+        f"🔗 Antilink: "
+        f"{'🟢 BẬT' if get_setting(chat_id, 'antilink', '0') == '1' else '🔴 TẮT'}\n"
+        f"👥 Antibuff: "
+        f"{'🟢 BẬT' if get_setting(chat_id, 'antibuff', '0') == '1' else '🔴 TẮT'}\n"
+        f"🕵️ Antifake: "
+        f"{'🟢 BẬT' if get_setting(chat_id, 'antifake', '0') == '1' else '🔴 TẮT'}",
+        parse_mode="HTML"
+    )
+
+
+# ------------------------------------------------------------
+# HÀM GỌI TOÀN BỘ BẢO VỆ
+# ------------------------------------------------------------
+
+def handle_protection(message):
+    """
+    Gọi các hệ thống bảo vệ.
+    Trả về True nếu tin nhắn đã bị xử lý/xóa.
+    """
+
+    if handle_antispam_message(message):
+        return True
+
+    if handle_antilink_message(message):
+        return True
+
+    handle_antibuff_message(message)
+    handle_antifake_message(message)
+
+    return False
+
+# ============================================================
+# PHẦN 5/15 — AFK + FILTER
+# ============================================================
+
+# ------------------------------------------------------------
+# AFK
+# ------------------------------------------------------------
+
+def set_afk(chat_id, user_id, reason):
+    db_execute(
+        """
+        INSERT INTO afk(chat_id, user_id, reason, created_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(chat_id, user_id)
+        DO UPDATE SET
+            reason=excluded.reason,
+            created_at=excluded.created_at
+        """,
+        (
+            chat_id,
+            user_id,
+            reason,
+            int(time.time())
+        )
+    )
+
+
+def remove_afk(chat_id, user_id):
+    db_execute(
+        "DELETE FROM afk WHERE chat_id=? AND user_id=?",
+        (chat_id, user_id)
+    )
+
+
+def get_afk(chat_id, user_id):
+    return db_fetchone(
+        """
+        SELECT reason, created_at
+        FROM afk
+        WHERE chat_id=? AND user_id=?
+        """,
+        (chat_id, user_id)
+    )
+
+
+def cmd_afk(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    user = message.get("from", {})
+    user_id = user.get("id")
+
+    reason = " ".join(args).strip()
+
+    if not reason:
+        reason = "không có lý do"
+
+    set_afk(
+        chat_id,
+        user_id,
+        reason
+    )
+
+    send_text(
+        chat_id,
+        f"💤 {mention_user(user)} đã bật AFK.\n"
+        f"📝 Lý do: {html.escape(reason)}",
+        parse_mode="HTML"
+    )
+
+
+def format_duration(seconds):
+    seconds = max(0, int(seconds))
+
+    days = seconds // 86400
+    seconds %= 86400
+
+    hours = seconds // 3600
+    seconds %= 3600
+
+    minutes = seconds // 60
+    seconds %= 60
+
+    parts = []
+
+    if days:
+        parts.append(f"{days} ngày")
+
+    if hours:
+        parts.append(f"{hours} giờ")
+
+    if minutes:
+        parts.append(f"{minutes} phút")
+
+    if not parts:
+        parts.append(f"{seconds} giây")
+
+    return " ".join(parts)
+
+
+def handle_afk_message(message):
+    chat = message.get("chat", {})
+
+    if not is_group_chat(chat):
+        return
+
+    chat_id = chat.get("id")
+    user = message.get("from", {})
+
+    if not user:
+        return
+
+    user_id = user.get("id")
+
+    # --------------------------------------------------------
+    # Nếu chính người AFK quay lại -> tắt AFK
+    # --------------------------------------------------------
+
+    own_afk = get_afk(
+        chat_id,
         user_id
     )
 
-    await send_message(
-        chat_id(message),
+    if own_afk:
+        remove_afk(
+            chat_id,
+            user_id
+        )
+
+        duration = format_duration(
+            time.time() - own_afk["created_at"]
+        )
+
+        send_text(
+            chat_id,
+            f"👋 {mention_user(user)} đã quay lại.\n"
+            f"⏱️ AFK: {duration}",
+            parse_mode="HTML"
+        )
+
+    # --------------------------------------------------------
+    # Nếu reply người đang AFK
+    # --------------------------------------------------------
+
+    reply = message.get("reply_to_message")
+
+    if reply:
+        target = reply.get("from")
+
+        if target:
+            afk = get_afk(
+                chat_id,
+                target.get("id")
+            )
+
+            if afk:
+                duration = format_duration(
+                    time.time() - afk["created_at"]
+                )
+
+                reason = html.escape(
+                    afk["reason"] or "không có lý do"
+                )
+
+                send_text(
+                    chat_id,
+                    f"💤 {mention_user(target)} đang AFK.\n"
+                    f"📝 Lý do: {reason}\n"
+                    f"⏱️ Đã AFK: {duration}",
+                    parse_mode="HTML"
+                )
+
+
+# ------------------------------------------------------------
+# FILTER
+# ------------------------------------------------------------
+
+def normalize_filter_word(text):
+    return re.sub(
+        r"\s+",
+        " ",
+        (text or "").strip().lower()
+    )
+
+
+def add_filter(chat_id, word, response):
+    word = normalize_filter_word(word)
+
+    if not word:
+        return False
+
+    db_execute(
+        """
+        INSERT INTO filters(chat_id, keyword, response)
+        VALUES (?, ?, ?)
+        ON CONFLICT(chat_id, keyword)
+        DO UPDATE SET response=excluded.response
+        """,
         (
-            "👋 <b>CHÀO MỪNG QUAY LẠI</b>\n\n"
-            f"👤 {mention_user(user)}\n"
-            f"⏱ Bạn đã AFK: "
-            f"<code>{elapsed}</code>\n"
-            "🟢 AFK đã được tắt."
+            chat_id,
+            word,
+            response
         )
     )
 
     return True
 
 
-# ============================================================
-# FILTER HELPERS
-# ============================================================
+def remove_filter(chat_id, word):
+    word = normalize_filter_word(word)
 
-def normalize_filter_keyword(
-    keyword
-):
-
-    return re.sub(
-        r"\s+",
-        " ",
-        keyword.strip().lower()
-    )
-
-
-async def get_filters(
-    chat
-):
-
-    return await adb_execute(
+    result = db_execute(
         """
-        SELECT
-            id,
-            keyword,
-            response
-        FROM filters
-        WHERE chat_id = ?
-        ORDER BY id ASC
+        DELETE FROM filters
+        WHERE chat_id=? AND keyword=?
         """,
         (
-            chat,
-        ),
-        fetch=True
+            chat_id,
+            word
+        )
+    )
+
+    return result
+
+
+def get_filters(chat_id):
+    return db_fetchall(
+        """
+        SELECT keyword, response
+        FROM filters
+        WHERE chat_id=?
+        ORDER BY keyword ASC
+        """,
+        (chat_id,)
     )
 
 
-# ============================================================
-# /FILTER
-# ============================================================
+def cmd_filter(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
 
-async def command_filter(
-    message,
-    args
-):
-
-    if not await require_admin(
-        message
-    ):
-        return
-
-    if "|" not in args:
-
-        await send_message(
-            chat_id(message),
-            (
-                "🔎 <b>Cách dùng</b>\n\n"
-                "<code>/filter từ khóa | nội dung trả lời</code>\n\n"
-                "Ví dụ:\n"
-                "<code>/filter hello | Xin chào!</code>"
-            )
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
         )
 
-        return
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được quản lý Filter."
+        )
 
-    keyword, response = args.split(
-        "|",
-        1
-    )
+    if len(args) < 2:
+        return send_text(
+            chat_id,
+            "🔎 Cách dùng:\n\n"
+            "/filter từ_khóa | nội_dung_trả_lời\n\n"
+            "Ví dụ:\n"
+            "/filter hello | Xin chào 👋"
+        )
 
-    keyword = normalize_filter_keyword(
-        keyword
-    )
+    raw = " ".join(args)
 
+    if "|" not in raw:
+        return send_text(
+            chat_id,
+            "❌ Phải có dấu | giữa từ khóa và nội dung."
+        )
+
+    keyword, response = raw.split("|", 1)
+
+    keyword = normalize_filter_word(keyword)
     response = response.strip()
 
     if not keyword:
-
-        await send_message(
-            chat_id(message),
+        return send_text(
+            chat_id,
             "❌ Từ khóa không được để trống."
         )
 
-        return
-
     if not response:
-
-        await send_message(
-            chat_id(message),
+        return send_text(
+            chat_id,
             "❌ Nội dung trả lời không được để trống."
         )
 
-        return
-
-    if len(keyword) > 200:
-
-        await send_message(
-            chat_id(message),
-            "❌ Từ khóa quá dài."
-        )
-
-        return
-
-    if len(response) > 3500:
-
-        await send_message(
-            chat_id(message),
-            "❌ Nội dung trả lời quá dài."
-        )
-
-        return
-
-    existing = await adb_execute(
-        """
-        SELECT id
-        FROM filters
-        WHERE chat_id = ?
-        AND keyword = ?
-        """,
-        (
-            chat_id(message),
-            keyword
-        ),
-        fetchone=True
+    add_filter(
+        chat_id,
+        keyword,
+        response
     )
 
-    if existing:
-
-        await adb_execute(
-            """
-            UPDATE filters
-            SET response = ?
-            WHERE id = ?
-            """,
-            (
-                response,
-                existing["id"]
-            )
-        )
-
-        action = "đã cập nhật"
-
-    else:
-
-        await adb_execute(
-            """
-            INSERT INTO filters
-            (
-                chat_id,
-                keyword,
-                response
-            )
-            VALUES (?, ?, ?)
-            """,
-            (
-                chat_id(message),
-                keyword,
-                response
-            )
-        )
-
-        action = "đã tạo"
-
-    await send_message(
-        chat_id(message),
-        (
-            "🔎 <b>FILTER</b>\n\n"
-            f"✅ Đã {action}.\n"
-            f"🔑 Từ khóa: "
-            f"<code>{html.escape(keyword)}</code>\n"
-            f"💬 Phản hồi: "
-            f"{html.escape(response)}"
-        )
+    send_text(
+        chat_id,
+        f"✅ Đã thêm filter:\n"
+        f"🔎 Từ khóa: <code>{html.escape(keyword)}</code>\n"
+        f"💬 Trả lời: {html.escape(response)}",
+        parse_mode="HTML"
     )
 
 
-# ============================================================
-# /FILTERS
-# ============================================================
+# ------------------------------------------------------------
+# FILTERS — DANH SÁCH
+# ------------------------------------------------------------
 
-async def command_filters(
-    message,
-    args
-):
+def cmd_filters(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
 
-    if not await require_group(
-        message
-    ):
-        return
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
 
-    rows = await get_filters(
-        chat_id(message)
-    )
+    rows = get_filters(chat_id)
 
     if not rows:
-
-        await send_message(
-            chat_id(message),
-            "🔎 Nhóm chưa có filter nào."
+        return send_text(
+            chat_id,
+            "🔎 Nhóm hiện chưa có filter nào."
         )
 
-        return
-
     lines = [
-        "🔎 <b>DANH SÁCH FILTER</b>\n"
+        "🔎 <b>DANH SÁCH FILTER</b>",
+        ""
     ]
 
-    for index, row in enumerate(
-        rows,
-        1
-    ):
-
+    for index, row in enumerate(rows, 1):
         keyword = html.escape(
             row["keyword"]
         )
@@ -7937,2857 +3362,5292 @@ async def command_filters(
             row["response"]
         )
 
-        if len(response) > 150:
-
-            response = (
-                response[:150]
-                + "..."
-            )
-
         lines.append(
-            f"{index}. "
-            f"<code>{keyword}</code>\n"
-            f"   ↳ {response}"
+            f"{index}. <code>{keyword}</code> → {response}"
         )
 
-    await send_message(
-        chat_id(message),
-        "\n".join(lines)
+    send_text(
+        chat_id,
+        "\n".join(lines),
+        parse_mode="HTML"
     )
 
 
-# ============================================================
-# /STOPFILTER
-# ============================================================
+# ------------------------------------------------------------
+# STOP FILTER
+# ------------------------------------------------------------
 
-async def command_stopfilter(
-    message,
-    args
-):
+def cmd_stop_filter(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
 
-    if not await require_admin(
-        message
-    ):
-        return
-
-    keyword = normalize_filter_keyword(
-        args
-    )
-
-    if not keyword:
-
-        await send_message(
-            chat_id(message),
-            (
-                "❗ Dùng:\n"
-                "<code>/stopfilter từ khóa</code>"
-            )
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
         )
 
-        return
+    if not is_admin(chat_id, message["from"]["id"]):
+        return send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được quản lý Filter."
+        )
 
-    result = await adb_execute(
+    if not args:
+        return send_text(
+            chat_id,
+            "❌ Dùng:\n/stopfilter từ_khóa"
+        )
+
+    keyword = normalize_filter_word(
+        " ".join(args)
+    )
+
+    existing = db_fetchone(
         """
-        DELETE FROM filters
-        WHERE chat_id = ?
-        AND keyword = ?
-        """,
-        (
-            chat_id(message),
-            keyword
-        )
-    )
-
-    # sqlite3 rowcount không được trả về từ
-    # helper hiện tại nên kiểm tra lại.
-    remaining = await adb_execute(
-        """
-        SELECT id
+        SELECT keyword
         FROM filters
-        WHERE chat_id = ?
-        AND keyword = ?
+        WHERE chat_id=? AND keyword=?
         """,
         (
-            chat_id(message),
+            chat_id,
             keyword
-        ),
-        fetchone=True
-    )
-
-    if remaining:
-
-        await send_message(
-            chat_id(message),
-            "❌ Không thể xóa filter."
-        )
-
-        return
-
-    await send_message(
-        chat_id(message),
-        (
-            "🗑 <b>FILTER ĐÃ XÓA</b>\n\n"
-            f"🔑 Từ khóa: "
-            f"<code>{html.escape(keyword)}</code>"
         )
     )
 
+    if not existing:
+        return send_text(
+            chat_id,
+            f"❌ Không tìm thấy filter: {keyword}"
+        )
 
-# ============================================================
-# FILTER MATCHING
-# ============================================================
+    remove_filter(
+        chat_id,
+        keyword
+    )
 
-async def handle_filters(
-    message
-):
+    send_text(
+        chat_id,
+        f"🗑️ Đã xóa filter: <code>{html.escape(keyword)}</code>",
+        parse_mode="HTML"
+    )
 
-    if not is_group(
-        message
-    ):
+
+# ------------------------------------------------------------
+# XỬ LÝ FILTER KHI CÓ TIN NHẮN
+# ------------------------------------------------------------
+
+def handle_filter_message(message):
+    chat = message.get("chat", {})
+
+    if not is_group_chat(chat):
         return False
 
-    text = message_text(
-        message
-    ).strip()
+    chat_id = chat.get("id")
+
+    text = (
+        message.get("text")
+        or message.get("caption")
+        or ""
+    )
 
     if not text:
         return False
 
-    rows = await get_filters(
-        chat_id(message)
-    )
+    normalized_text = normalize_filter_word(text)
+
+    rows = get_filters(chat_id)
 
     if not rows:
         return False
 
-    normalized_text = text.lower()
+    user = message.get("from", {})
+
+    # Admin vẫn có thể kích hoạt filter.
+    # Filter là luật của nhóm, không phải quyền người dùng.
 
     for row in rows:
-
-        keyword = (
+        keyword = normalize_filter_word(
             row["keyword"]
-            or ""
-        ).lower()
+        )
 
         if not keyword:
             continue
 
-        # Match theo cụm từ, không cần
-        # message phải bằng hoàn toàn keyword.
+        # Tìm theo cụm từ
         if keyword in normalized_text:
+            response = row["response"]
 
-            response = row[
-                "response"
-            ]
-
-            await send_message(
-                chat_id(message),
+            send_text(
+                chat_id,
                 response,
-                reply_to=message_id(message)
+                reply_to=message.get("message_id")
             )
-
-            RUNTIME_STATS[
-                "filter_hits"
-            ] += 1
 
             return True
 
     return False
 
 
-# ============================================================
-# REGISTER AFK + FILTER COMMANDS
-# ============================================================
+# ------------------------------------------------------------
+# FILTER TỰ ĐỘNG XÓA
+# ------------------------------------------------------------
 
-COMMAND_HANDLERS.update({
+def handle_filter_delete(message):
+    """
+    Hàm này chỉ dùng khi filter được cấu hình đặc biệt.
+    Hiện tại không tự xóa tin nhắn để tránh xóa nhầm.
+    """
 
-    "afk":
-        lambda message, args:
-            command_afk(
-                message,
-                args
-            ),
-
-    "filter":
-        lambda message, args:
-            command_filter(
-                message,
-                args
-            ),
-
-    "filters":
-        lambda message, args:
-            command_filters(
-                message,
-                args
-            ),
-
-    "stopfilter":
-        lambda message, args:
-            command_stopfilter(
-                message,
-                args
-            ),
-})
+    return False
 
 
-# ============================================================
-# PATCH MESSAGE PROCESSING
-# AFK + FILTER
-# ============================================================
+# ------------------------------------------------------------
+# XỬ LÝ AFK + FILTER CHUNG
+# ------------------------------------------------------------
 
-_previous_process_update_v6 = process_update
+def handle_extra_message_features(message):
+    """
+    Chạy AFK và Filter cho mỗi message.
+    """
 
+    handle_afk_message(message)
 
-async def process_update(
-    update
-):
-
-    if not isinstance(
-        update,
-        dict
-    ):
-        return
-
-    # chat_member vẫn đi qua protection.
-    if update.get(
-        "chat_member"
-    ):
-
-        await process_chat_member_update(
-            update
+    try:
+        handle_filter_message(message)
+    except Exception as e:
+        logging.exception(
+            "Filter error: %s",
+            e
         )
 
-        return
-
-    message = (
-        update.get("message")
-        or update.get("edited_message")
-    )
-
-    if not message:
-        return
-
-    user = from_user(
-        message
-    )
-
-    if user:
-        await save_user(
-            user
-        )
-
-    RUNTIME_STATS[
-        "messages"
-    ] += 1
-
-    if is_group(
-        message
-    ):
-
-        RUNTIME_STATS[
-            "groups"
-        ] += 1
-
-    elif is_private(
-        message
-    ):
-
-        RUNTIME_STATS[
-            "private"
-        ] += 1
-
-    # Bot-ban.
-    if (
-        user
-        and await is_bot_banned(
-            user.get("id")
-        )
-        and not is_owner(user)
-    ):
-
-        return
-
-    # Protection.
-    blocked = await run_message_protection(
-        message
-    )
-
-    if blocked:
-        return
-
-    # Nếu người đang AFK gửi message,
-    # xóa trạng thái AFK trước.
-    await handle_afk_return(
-        message
-    )
-
-    # Nếu message reply/mention người AFK,
-    # thông báo trạng thái AFK.
-    await handle_afk_notification(
-        message
-    )
-
-    # Filter.
-    await handle_filters(
-        message
-    )
-
-    # Command.
-    await dispatch_command(
-        message
-    )
-
-    await _previous_process_update_v6(
-        update
-    )
-
 # ============================================================
-# END PHẦN 7/10
+# PHẦN 6/15 — THƠ ĐỜI / THƠ TÌNH / ĐIỂM DANH
 # ============================================================
 
-# ============================================================
-# THEONE BOT - PURE PYTHON VERSION
-# PHẦN 8/10
-# THƠ + ĐIỂM DANH
-# /thodoi /thotinh /diemdanh
-# ============================================================
-
-
-# ============================================================
-# THƠ ĐỜI
-# ============================================================
+# ------------------------------------------------------------
+# 20 CÂU / BÀI THƠ ĐỜI
+# ------------------------------------------------------------
 
 THO_DOI = [
-    "Đời người như một chuyến xe,\nCó người đồng hành, có người xuống xe.",
-    "Ngoài kia giông gió đầy trời,\nGiữ lòng bình thản, mỉm cười bước qua.",
-    "Có những ngày chẳng muốn nói gì,\nChỉ mong bình yên ở lại bên mình.",
-    "Đường đời chẳng phải lúc nào cũng đẹp,\nNhưng mỗi bước đi đều đáng để trưởng thành.",
-    "Người đi qua để lại bài học,\nNgười ở lại cho ta một niềm tin.",
-    "Có lúc tưởng chẳng còn đường,\nBước thêm một bước lại thường thấy lối ra.",
-    "Thành công không đến trong một đêm,\nNó được xây bằng những ngày không bỏ cuộc.",
-    "Đời có lúc lên rồi lại xuống,\nQuan trọng là mình vẫn đứng dậy đi tiếp.",
-    "Đừng buồn vì chuyện đã qua,\nNgày mai vẫn có một trời bình yên.",
-    "Có những thất bại rất đau,\nNhưng chính chúng dạy ta cách mạnh mẽ hơn.",
-    "Chậm một chút cũng không sao,\nMiễn là đôi chân vẫn bước về phía trước.",
-    "Đừng so mình với người khác,\nMỗi người có một hành trình riêng.",
-    "Có tiền chưa chắc mua được bình yên,\nCó bình yên mới biết tiền chẳng phải tất cả.",
-    "Người hiểu mình chẳng cần nói nhiều,\nNgười không hiểu giải thích bao nhiêu cũng thừa.",
-    "Đôi khi im lặng là cách trả lời,\nKhông phải chuyện gì cũng đáng để tranh cãi.",
-    "Hôm nay có thể rất mệt,\nNhưng ngày mai vẫn có thể bắt đầu lại.",
-    "Đời ngắn lắm, đừng giữ mãi muộn phiền,\nHãy giữ những người khiến mình thấy bình yên.",
-    "Có những cánh cửa đóng lại,\nĐể mở ra một con đường khác tốt hơn cho mình.",
-    "Mạnh mẽ không phải không biết đau,\nMà là đau rồi vẫn chọn bước tiếp.",
-    "Sau tất cả những ngày giông bão,\nĐiều còn lại quý nhất là một tâm hồn bình yên."
+    "Đời người như một chuyến xe,\nCó người lên sớm, có người xuống sau.\nGặp nhau chẳng được bao lâu,\nNên xin hãy sống thật sâu nghĩa tình.",
+
+    "Ngoài kia phong ba bão tố,\nBình yên đôi khi chỉ ở trong lòng.\nĐừng mong cuộc sống màu hồng,\nHọc cách mạnh mẽ giữa dòng thế gian.",
+
+    "Có những ngày chẳng muốn cười,\nCó những đêm chẳng muốn người hỏi han.\nNhưng rồi ngày mới lại sang,\nTự mình đứng dậy, bước ngang nỗi buồn.",
+
+    "Tiền nhiều chưa chắc bình yên,\nDanh cao chưa chắc có duyên với đời.\nĐến khi nhắm mắt buông xuôi,\nChỉ mong còn lại một người nhớ ta.",
+
+    "Đường đời lắm lúc chông gai,\nThua hôm nay chẳng có nghĩa thua hoài.\nMiễn còn giữ được tương lai,\nThì còn cơ hội ngày mai làm người.",
+
+    "Người thương ta thật chẳng nhiều,\nNgười vì lợi ích thì điều chẳng hiếm.\nSống sao cho đáng chữ tình,\nĐừng vì một chút lợi mình mà quên.",
+
+    "Có tiền mua được căn nhà,\nNhưng không mua được người nhà yêu thương.\nCó tiền mua được chiếc giường,\nNhưng không mua được giấc thường bình yên.",
+
+    "Đời người ngắn tựa làn mây,\nHôm nay còn đó, mai này đã xa.\nVậy nên đừng sống hơn thua,\nBình an mới chính là quà trời cho.",
+
+    "Người đi để lại câu thề,\nNgười ở ôm lấy bộn bề tháng năm.\nSau cùng mới hiểu âm thầm,\nCó người từng quý mà mình chẳng hay.",
+
+    "Đừng cười khi thấy người đau,\nĐời ai rồi cũng có lúc lao đao.\nHôm nay họ đứng thấp cao,\nNgày mai chưa biết ai nào hơn ai.",
+
+    "Có những bài học trong đời,\nKhông nằm trên sách, chẳng nơi trường nào.\nPhải qua nước mắt lao đao,\nMới hay trưởng thành đổi màu thời gian.",
+
+    "Đời không phải lúc nào vui,\nCó khi phải khóc để rồi trưởng thành.\nSau bao giông tố mong manh,\nTa càng hiểu được chữ lành chữ thương.",
+
+    "Thành công chẳng đến một ngày,\nMà từ những lúc trắng tay đứng nhìn.\nNếu còn giữ được niềm tin,\nThì còn có thể tự mình bước đi.",
+
+    "Đừng vì một phút nóng lòng,\nMà đem cả những tấm lòng đánh rơi.\nLời nói một khi buông rồi,\nMuốn thu lại cũng chẳng đời nào nguyên.",
+
+    "Người khôn biết lúc nên cười,\nBiết khi im lặng, biết người nào nên xa.\nĐời người chẳng rộng bao la,\nĐừng đem thời gian đổi qua hận thù.",
+
+    "Có những người đến rồi đi,\nNhưng đem bài học khắc ghi suốt đời.\nDẫu cho duyên đã xa rồi,\nXin còn cảm tạ một thời gặp nhau.",
+
+    "Mệt thì cứ nghỉ một ngày,\nNhưng đừng bỏ cuộc giữa đầy khó khăn.\nChậm thôi cũng chẳng muộn màng,\nMiễn là đôi bước vẫn đang tiến về.",
+
+    "Đừng nhìn thiên hạ hơn mình,\nMỗi người một cảnh, một tình, một duyên.\nChỉ cần hôm nay tốt hơn,\nHơn mình của chính ngày hôm qua là mừng.",
+
+    "Cuộc đời vốn chẳng công bằng,\nNhưng ta vẫn phải cố gắng mỗi ngày.\nChẳng cần thắng hết cuộc đời,\nChỉ cần không thắng chính mình là thua.",
+
+    "Sau cùng điều quý nhất đời,\nKhông là vật chất, chẳng lời phù hoa.\nLà khi ngoảnh lại đường xa,\nThấy mình đã sống thật thà với nhau."
 ]
 
 
-async def command_thodoi(
-    message,
-    args
-):
-
-    poem = random.choice(
-        THO_DOI
-    )
-
-    await send_message(
-        chat_id(message),
-        (
-            "📜 <b>THƠ ĐỜI</b>\n\n"
-            f"{html.escape(poem)}"
-        )
-    )
-
-
-# ============================================================
-# THƠ TÌNH
-# ============================================================
+# ------------------------------------------------------------
+# 20 CÂU / BÀI THƠ TÌNH
+# ------------------------------------------------------------
 
 THO_TINH = [
-    "Nếu ngày mai trời chẳng còn xanh,\nAnh vẫn mong được cạnh em bình yên.",
-    "Em như một khoảng trời dịu dàng,\nĐi qua tim anh rồi chẳng muốn rời.",
-    "Có những người chỉ gặp một lần,\nNhưng khiến cả đời chẳng thể quên.",
-    "Anh chẳng cần một tình yêu hoàn hảo,\nChỉ cần người ở lại lúc anh yếu lòng.",
-    "Nếu thương là một điều đơn giản,\nThì anh đã thương em từ rất lâu.",
-    "Giữa hàng triệu người ngoài kia,\nAnh vẫn vô thức tìm một người giống em.",
-    "Có em, ngày dài bỗng ngắn,\nCó em, bình thường cũng hóa dịu dàng.",
-    "Anh không hứa cho em cả thế giới,\nNhưng hứa cùng em đi qua thế giới này.",
-    "Tình yêu chẳng cần lời hoa mỹ,\nChỉ cần lúc khó khăn vẫn nắm tay nhau.",
-    "Em đến như cơn mưa mùa hạ,\nNhẹ nhàng nhưng làm ướt cả trái tim.",
-    "Nếu khoảng cách là điều duy nhất ngăn mình,\nThì nhớ thương sẽ là cây cầu nối lại.",
-    "Anh thích những buổi chiều bình thường,\nMiễn là người bên cạnh vẫn là em.",
-    "Có những câu yêu chưa từng nói,\nNhưng ánh mắt đã nói thay tất cả rồi.",
-    "Thương một người chẳng cần lý do,\nChỉ cần nghĩ đến họ là lòng thấy vui.",
-    "Anh chẳng biết ngày mai sẽ thế nào,\nChỉ biết hôm nay anh vẫn thương em.",
-    "Nếu được chọn lại giữa muôn người,\nAnh vẫn muốn gặp em thêm một lần nữa.",
-    "Tình yêu đẹp nhất không phải lúc bắt đầu,\nMà là khi cả hai vẫn chọn nhau sau giông bão.",
-    "Em không phải điều duy nhất trên đời,\nNhưng là điều khiến đời anh trở nên đặc biệt.",
-    "Có một người khiến tim anh dịu lại,\nMỗi khi mệt mỏi chỉ cần nhớ đến người.",
-    "Nếu thương em là một chuyến đi dài,\nAnh nguyện đi chậm để được bên em lâu hơn."
+    "Nếu đời là một bản nhạc,\nAnh mong em là giai điệu cuối cùng.\nDẫu cho thế giới mênh mông,\nChỉ cần có em là lòng bình yên.",
+
+    "Anh không hứa cả đời này,\nSẽ không có lúc đắng cay giữa đường.\nNhưng anh hứa sẽ yêu thương,\nKhi em mỏi mệt, anh thường ở đây.",
+
+    "Em như ánh nắng ban mai,\nSoi vào những tháng năm dài cô đơn.\nTừ ngày em bước vào lòng,\nThế gian bỗng hóa dịu dàng hơn xưa.",
+
+    "Có người hỏi thích điều gì,\nAnh cười chẳng biết nói gì ngoài em.\nBởi vì từ lúc quen em,\nTim anh chẳng muốn gọi tên một người.",
+
+    "Nếu mai trời có mưa bay,\nAnh mong mình vẫn nắm tay cùng người.\nDẫu cho năm tháng đổi dời,\nTình này vẫn giữ một đời chẳng phai.",
+
+    "Yêu em chẳng phải vì xinh,\nMà vì em khiến tim mình bình yên.\nGiữa bao người ở ngoài kia,\nChỉ riêng ánh mắt em làm anh rung.",
+
+    "Anh chẳng cần những lời thề,\nChỉ cần mỗi tối em về bình an.\nNgoài kia dẫu có gian nan,\nVề bên anh nhé, bình an đủ rồi.",
+
+    "Ngày dài rồi cũng sẽ qua,\nChỉ mong người ấy vẫn là người thương.\nDẫu cho đi hết đoạn đường,\nCuối cùng vẫn muốn chung đường với em.",
+
+    "Có em ngày tháng dịu dàng,\nCó em những lúc hoang mang nhẹ lòng.\nTình yêu chẳng cần cầu mong,\nChỉ cần hai đứa thật lòng với nhau.",
+
+    "Anh từng nghĩ chẳng cần ai,\nCho đến khi gặp một người là em.\nTừ ngày ánh mắt chạm nhau,\nTrái tim bỗng chẳng còn đâu bình thường.",
+
+    "Nếu được chọn lại một lần,\nAnh vẫn chọn gặp người cần gặp em.\nDẫu cho phía trước có thêm,\nBao nhiêu thử thách vẫn tìm đến nhau.",
+
+    "Em không phải cả thế gian,\nNhưng em là cả bình an trong lòng.\nNgoài kia vạn vật đổi dòng,\nChỉ mong tình chúng ta không đổi dời.",
+
+    "Thương em chẳng nói thành lời,\nChỉ mong em hiểu những điều anh mong.\nMột đời chẳng cần quá đông,\nChỉ cần một người thật lòng bên nhau.",
+
+    "Nếu tình yêu có hình hài,\nAnh mong nó giống bàn tay của em.\nẤm áp, dịu dàng mỗi đêm,\nĐủ làm tim nhỏ ngủ yên giữa đời.",
+
+    "Anh không biết ngày mai nào,\nNhưng anh biết muốn cùng em đi hoài.\nDẫu cho tóc có bạc màu,\nVẫn mong được gọi tên nhau mỗi ngày.",
+
+    "Em là một chút dịu dàng,\nGiữa bao bộn bề ngổn ngang cuộc đời.\nGặp em anh thấy tuyệt vời,\nVì tim có chỗ để người thương nhau.",
+
+    "Chẳng cần hứa chuyện trăm năm,\nChỉ cần hiện tại âm thầm thương nhau.\nMai sau dẫu có thế nào,\nTừng yêu chân thật là điều đẹp thay.",
+
+    "Anh thích những buổi chiều mưa,\nThích nghe em kể chuyện xưa chuyện đời.\nChẳng cần vật chất xa xôi,\nCó em bên cạnh là rồi đủ vui.",
+
+    "Nếu một ngày em thấy buồn,\nĐừng ngại gọi nhé, anh luôn nghe mà.\nDẫu cho khoảng cách thật xa,\nTấm lòng anh vẫn tìm qua bên người.",
+
+    "Tình yêu đẹp nhất trên đời,\nKhông cần hoàn hảo, chỉ người thật tâm.\nHai người cùng bước âm thầm,\nQua bao giông gió vẫn cầm tay nhau."
 ]
 
 
-async def command_thotinh(
-    message,
-    args
-):
+def cmd_thodoi(message, args):
+    chat_id = message.get("chat", {}).get("id")
 
-    poem = random.choice(
-        THO_TINH
+    poem = random.choice(THO_DOI)
+
+    send_text(
+        chat_id,
+        "🌿 <b>THƠ ĐỜI</b>\n\n"
+        + html.escape(poem),
+        parse_mode="HTML"
     )
 
-    await send_message(
-        chat_id(message),
+
+def cmd_thotinh(message, args):
+    chat_id = message.get("chat", {}).get("id")
+
+    poem = random.choice(THO_TINH)
+
+    send_text(
+        chat_id,
+        "❤️ <b>THƠ TÌNH</b>\n\n"
+        + html.escape(poem),
+        parse_mode="HTML"
+    )
+
+
+# ------------------------------------------------------------
+# ĐIỂM DANH
+# ------------------------------------------------------------
+
+def today_string():
+    return datetime.datetime.now().strftime("%Y-%m-%d")
+
+
+def get_checkin(chat_id, user_id):
+    return db_fetchone(
+        """
+        SELECT streak, last_date
+        FROM checkins
+        WHERE chat_id=? AND user_id=?
+        """,
         (
-            "❤️ <b>THƠ TÌNH</b>\n\n"
-            f"{html.escape(poem)}"
+            chat_id,
+            user_id
         )
     )
 
 
-# ============================================================
-# ĐIỂM DANH - DATE HELPER
-# ============================================================
+def update_checkin(chat_id, user_id):
+    today = today_string()
 
-def current_date():
-
-    # Dùng ngày UTC để database có
-    # một mốc thống nhất.
-    return datetime.now(
-        timezone.utc
-    ).date()
-
-
-def previous_date(
-    date_value
-):
-
-    return date_value - timedelta(
-        days=1
+    row = get_checkin(
+        chat_id,
+        user_id
     )
 
+    if not row:
+        streak = 1
 
-# ============================================================
-# GET LATEST CHECK-IN
-# ============================================================
+        db_execute(
+            """
+            INSERT INTO checkins
+            (chat_id, user_id, streak, last_date)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                chat_id,
+                user_id,
+                streak,
+                today
+            )
+        )
 
-async def get_latest_checkin(
-    chat,
-    user_id
-):
+        return streak, True
 
-    return await adb_execute(
+    last_date = row["last_date"]
+    old_streak = int(row["streak"] or 0)
+
+    if last_date == today:
+        return old_streak, False
+
+    try:
+        last = datetime.datetime.strptime(
+            last_date,
+            "%Y-%m-%d"
+        ).date()
+
+        current = datetime.datetime.strptime(
+            today,
+            "%Y-%m-%d"
+        ).date()
+
+        difference = (
+            current - last
+        ).days
+
+    except Exception:
+        difference = 999
+
+    if difference == 1:
+        streak = old_streak + 1
+    else:
+        streak = 1
+
+    db_execute(
         """
-        SELECT
-            checkin_date,
-            streak
-        FROM checkins
-        WHERE chat_id = ?
-        AND user_id = ?
-        ORDER BY checkin_date DESC
-        LIMIT 1
+        UPDATE checkins
+        SET streak=?, last_date=?
+        WHERE chat_id=? AND user_id=?
         """,
         (
-            chat,
+            streak,
+            today,
+            chat_id,
             user_id
-        ),
-        fetchone=True
+        )
     )
 
+    return streak, True
 
-# ============================================================
-# CHECK-IN BUTTON
-# ============================================================
 
-async def send_checkin_panel(
-    message
-):
+def cmd_diemdanh(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
 
     keyboard = {
         "inline_keyboard": [
             [
                 {
                     "text": "🔥 Điểm danh",
-                    "callback_data":
-                        "daily_checkin"
+                    "callback_data": "checkin"
                 }
             ]
         ]
     }
 
-    await api(
-        "sendMessage",
-        {
-            "chat_id":
-                chat_id(message),
-
-            "text":
-                (
-                    "🔥 <b>ĐIỂM DANH HẰNG NGÀY</b>\n\n"
-                    "Nhấn nút bên dưới để điểm danh.\n"
-                    "📅 Mỗi ngày chỉ được điểm danh một lần.\n"
-                    "🔥 Điểm danh liên tiếp sẽ tăng streak."
-                ),
-
-            "parse_mode":
-                "HTML",
-
-            "reply_markup":
-                json.dumps(
-                    keyboard
-                )
-        }
+    send_text(
+        chat_id,
+        "📋 <b>ĐIỂM DANH HÔM NAY</b>\n\n"
+        "Bấm nút bên dưới để điểm danh.\n"
+        "🔥 Mỗi ngày điểm danh sẽ duy trì Streak.",
+        parse_mode="HTML",
+        reply_markup=keyboard
     )
 
 
-# ============================================================
-# /DIEMDANH
-# ============================================================
+def handle_checkin_callback(callback):
+    data = callback.get("data", "")
 
-async def command_diemdanh(
-    message,
-    args
-):
+    if data != "checkin":
+        return False
 
-    if not await require_group(
-        message
-    ):
-        return
+    message = callback.get("message") or {}
+    user = callback.get("from") or {}
 
-    await send_checkin_panel(
-        message
-    )
+    chat = message.get("chat") or {}
+    chat_id = chat.get("id")
+    user_id = user.get("id")
 
+    if not chat_id or not user_id:
+        return True
 
-# ============================================================
-# CALLBACK ANSWER
-# ============================================================
-
-async def answer_callback(
-    callback_id,
-    text,
-    show_alert=False
-):
-
-    return await api(
-        "answerCallbackQuery",
-        {
-            "callback_query_id":
-                callback_id,
-
-            "text":
-                text,
-
-            "show_alert":
-                show_alert
-        }
-    )
-
-
-# ============================================================
-# HANDLE DAILY CHECK-IN
-# ============================================================
-
-async def handle_daily_checkin(
-    callback
-):
-
-    callback_id = callback.get(
-        "id"
-    )
-
-    user = callback.get(
-        "from",
-        {}
-    )
-
-    message = callback.get(
-        "message"
-    )
-
-    if not message:
-
-        await answer_callback(
-            callback_id,
-            "❌ Không tìm thấy nhóm.",
-            True
-        )
-
-        return
-
-    chat = message.get(
-        "chat",
-        {}
-    )
-
-    if chat.get(
-        "type"
-    ) not in GROUP_TYPES:
-
-        await answer_callback(
-            callback_id,
-            "❌ Chỉ điểm danh trong nhóm.",
-            True
-        )
-
-        return
-
-    chat_value = chat.get(
-        "id"
-    )
-
-    user_id = user.get(
-        "id"
-    )
-
-    if not user_id:
-
-        await answer_callback(
-            callback_id,
-            "❌ Không xác định được tài khoản.",
-            True
-        )
-
-        return
-
-    today = current_date()
-
-    today_text = today.isoformat()
-
-    existing = await adb_execute(
-        """
-        SELECT
-            streak
-        FROM checkins
-        WHERE chat_id = ?
-        AND user_id = ?
-        AND checkin_date = ?
-        """,
-        (
-            chat_value,
-            user_id,
-            today_text
-        ),
-        fetchone=True
-    )
-
-    if existing:
-
-        await answer_callback(
-            callback_id,
-            (
-                "🔥 Bạn đã điểm danh hôm nay rồi!"
-                f" Streak: {existing['streak']}"
-            ),
-            True
-        )
-
-        return
-
-    latest = await get_latest_checkin(
-        chat_value,
+    streak, is_new = update_checkin(
+        chat_id,
         user_id
     )
 
-    streak = 1
+    callback_id = callback.get("id")
 
-    if latest:
+    if callback_id:
+        if is_new:
+            tg_call(
+                "answerCallbackQuery",
+                {
+                    "callback_query_id": callback_id,
+                    "text": f"🔥 Điểm danh thành công! Streak: {streak} ngày",
+                    "show_alert": False
+                }
+            )
 
-        try:
+            send_text(
+                chat_id,
+                f"🔥 {mention_user(user)} điểm danh thành công!\n"
+                f"📅 Streak: <b>{streak} ngày</b>",
+                parse_mode="HTML"
+            )
+        else:
+            tg_call(
+                "answerCallbackQuery",
+                {
+                    "callback_query_id": callback_id,
+                    "text": f"Bạn đã điểm danh hôm nay! Streak: {streak} ngày",
+                    "show_alert": True
+                }
+            )
 
-            latest_date = datetime.strptime(
-                latest["checkin_date"],
-                "%Y-%m-%d"
-            ).date()
+    return True
 
-            if latest_date == previous_date(
-                today
-            ):
+# ============================================================
+# PHẦN 7/15 — LEVEL SYSTEM
+# ============================================================
 
-                streak = (
-                    int(
-                        latest["streak"]
-                    )
-                    + 1
-                )
+# ------------------------------------------------------------
+# CẤU HÌNH LEVEL
+# ------------------------------------------------------------
 
-        except Exception:
+LEVEL_THRESHOLDS = {
+    1: 0,
+    2: 100,
+    3: 300,
+    4: 500,
+    5: 700,
+    6: 900,
+    7: 1200,
+    8: 1600,
+    9: 2000,
+    10: 3000
+}
 
-            streak = 1
 
-    await adb_execute(
+def calculate_level(messages):
+    """
+    Xác định level dựa trên tổng số tin nhắn.
+    """
+
+    messages = int(messages or 0)
+
+    current_level = 1
+
+    for level, required in sorted(
+        LEVEL_THRESHOLDS.items()
+    ):
+        if messages >= required:
+            current_level = level
+        else:
+            break
+
+    return current_level
+
+
+def get_level_user(chat_id, user_id):
+    return db_fetchone(
         """
-        INSERT INTO checkins
+        SELECT user_id, messages, level
+        FROM levels
+        WHERE chat_id=? AND user_id=?
+        """,
         (
             chat_id,
-            user_id,
-            checkin_date,
-            streak
+            user_id
         )
+    )
+
+
+def create_level_user(chat_id, user):
+    user_id = user.get("id")
+
+    if not user_id:
+        return None
+
+    row = get_level_user(
+        chat_id,
+        user_id
+    )
+
+    if row:
+        return row
+
+    db_execute(
+        """
+        INSERT INTO levels
+        (chat_id, user_id, messages, level)
         VALUES (?, ?, ?, ?)
         """,
         (
-            chat_value,
+            chat_id,
             user_id,
-            today_text,
-            streak
+            0,
+            1
         )
     )
 
-    await answer_callback(
-        callback_id,
-        f"🔥 Điểm danh thành công! Streak {streak}",
-        True
-    )
-
-    await send_message(
-        chat_value,
-        (
-            "🔥 <b>ĐIỂM DANH THÀNH CÔNG</b>\n\n"
-            f"👤 "
-            f"{mention_user(user)}\n"
-            f"📅 Ngày: "
-            f"<code>{today_text}</code>\n"
-            f"🔥 Streak: "
-            f"<code>{streak}</code> ngày\n\n"
-            "💪 Tiếp tục ngày mai nhé!"
-        )
+    return get_level_user(
+        chat_id,
+        user_id
     )
 
 
-# ============================================================
-# CALLBACK UPDATE
-# ============================================================
-
-async def process_callback_update(
-    update
-):
-
-    callback = update.get(
-        "callback_query"
-    )
-
-    if not callback:
-        return
-
-    # Menu /start
-    if await handle_start_menu_callback(
-        callback
-    ):
-        return
-
-    data = callback.get(
-        "data"
-    )
-
-    if data == "start_ai":
-        await answer_callback(
-            callback.get("id"),
-            "🤖 Ngọc Mỹ AI đã mở!"
-        )
-
-        await send_message(
-            callback.get("message", {}).get("chat", {}).get("id"),
-            "🤖 <b>NGỌC MỸ AI</b>\n\n"
-            "Hãy gửi câu hỏi cho mình bằng lệnh:\n"
-            "<code>/ai câu hỏi của bạn</code>\n\n"
-            "Ví dụ:\n"
-            "<code>/ai Trái Đất có bao nhiêu đại dương?</code>",
-            parse_mode="HTML"
-        )
-
-        return
-
-    # Điểm danh
-    if data == "daily_checkin":
-
-        await handle_daily_checkin(
-            callback
-        )
-
-        return
-
-    await answer_callback(
-        callback.get("id"),
-        "❌ Nút không còn hiệu lực."
-    )
-
-# ============================================================
-# REGISTER POEM + CHECK-IN
-# ============================================================
-
-COMMAND_HANDLERS.update({
-
-    "thodoi":
-        lambda message, args:
-            command_thodoi(
-                message,
-                args
-            ),
-
-    "thotinh":
-        lambda message, args:
-            command_thotinh(
-                message,
-                args
-            ),
-
-    "diemdanh":
-        lambda message, args:
-            command_diemdanh(
-                message,
-                args
-            ),
-})
-
-
-# ============================================================
-# PATCH PROCESS UPDATE
-# CALLBACK + MESSAGE
-# ============================================================
-
-_previous_process_update_v7 = process_update
-
-
-async def process_update(
-    update
-):
-
-    if not isinstance(
-        update,
-        dict
-    ):
-        return
-
-    # Inline button callback.
-    if update.get(
-        "callback_query"
-    ):
-
-        try:
-
-            await process_callback_update(
-                update
-            )
-
-        except Exception as e:
-
-            logger.exception(
-                "Callback error: %s",
-                e
-            )
-
-        return
-
-    # Chat member.
-    if update.get(
-        "chat_member"
-    ):
-
-        try:
-
-            await process_chat_member_update(
-                update
-            )
-
-        except Exception as e:
-
-            logger.exception(
-                "Chat member error: %s",
-                e
-            )
-
-        return
-
-    message = (
-        update.get("message")
-        or update.get("edited_message")
-    )
-
-    if not message:
-        return
-
-    user = from_user(
-        message
-    )
-
-    if user:
-
-        await save_user(
-            user
-        )
-
-    RUNTIME_STATS[
-        "messages"
-    ] += 1
-
-    if is_group(
-        message
-    ):
-
-        RUNTIME_STATS[
-            "groups"
-        ] += 1
-
-    elif is_private(
-        message
-    ):
-
-        RUNTIME_STATS[
-            "private"
-        ] += 1
-
-    # Bot ban.
-    if (
-        user
-        and await is_bot_banned(
-            user.get("id")
-        )
-        and not is_owner(user)
-    ):
-
-        return
-
-    # Protection.
-    blocked = await run_message_protection(
-        message
-    )
-
-    if blocked:
-        return
-
-    # AFK return.
-    await handle_afk_return(
-        message
-    )
-
-    # AFK notification.
-    await handle_afk_notification(
-        message
-    )
-
-    # Filters.
-    await handle_filters(
-        message
-    )
-
-    # Commands.
-    await dispatch_command(
-        message
-    )
-
-    await _previous_process_update_v7(
-        update
-    )
-
-# ============================================================
-# UPDATE GETUPDATES
-# Thêm callback_query để nút điểm danh hoạt động.
-# ============================================================
-
-async def get_updates(
-    offset=None,
-    timeout=30
-):
-
-    data = {
-        "timeout":
-            timeout,
-
-        "allowed_updates":
-            json.dumps(
-                [
-                    "message",
-                    "edited_message",
-                    "chat_member",
-                    "callback_query"
-                ]
-            )
-    }
-
-    if offset is not None:
-
-        data["offset"] = offset
-
-    return await api(
-        "getUpdates",
-        data,
-        timeout=timeout + 10
-    )
-
-
-# ============================================================
-# END PHẦN 8/10
-# ============================================================
-
-# ============================================================
-# THEONE BOT - PURE PYTHON VERSION
-# PHẦN 9/10
-# FIX LỖI + ANTIFAKE NÂNG CAO + HOÀN THIỆN BẢO VỆ
-# ============================================================
-
-
-# ============================================================
-# FIX PROFILE DATABASE
-# Ghi nhớ profile theo từng user trong từng nhóm.
-# ============================================================
-
-async def save_known_profile(
-    chat,
-    user
-):
-
-    if not chat or not user:
-        return
+def add_level_message(chat_id, user):
+    """
+    Cộng 1 tin nhắn cho user.
+
+    Trả về:
+        old_level
+        new_level
+        total_messages
+    """
 
     user_id = user.get("id")
 
     if not user_id:
-        return
+        return 1, 1, 0
 
-    display_name = user_full_name(
-        user
+    row = get_level_user(
+        chat_id,
+        user_id
     )
 
-    username = user.get(
-        "username"
-    )
-
-    now = datetime.now(
-        timezone.utc
-    ).isoformat()
-
-    await adb_execute(
-        """
-        INSERT INTO known_profiles
-        (
-            chat_id,
-            user_id,
-            username,
-            display_name,
-            first_seen
-        )
-        VALUES (?, ?, ?, ?, ?)
-
-        ON CONFLICT(chat_id, user_id)
-        DO UPDATE SET
-            username = excluded.username,
-            display_name = excluded.display_name
-        """,
-        (
-            chat,
-            user_id,
-            username,
-            display_name,
-            now
-        )
-    )
-
-
-# ============================================================
-# GET KNOWN PROFILE
-# ============================================================
-
-async def get_known_profile(
-    chat,
-    user_id
-):
-
-    return await adb_execute(
-        """
-        SELECT
-            chat_id,
-            user_id,
-            username,
-            display_name,
-            first_seen
-        FROM known_profiles
-        WHERE chat_id = ?
-        AND user_id = ?
-        """,
-        (
-            chat,
-            user_id
-        ),
-        fetchone=True
-    )
-
-
-# ============================================================
-# NORMALIZE TÊN ĐỂ PHÁT HIỆN UNICODE TRICK
-# ============================================================
-
-def normalize_identity_text(
-    text
-):
-
-    if not text:
-        return ""
-
-    text = str(
-        text
-    ).strip().lower()
-
-    # Một số ký tự vô hình thường được
-    # dùng để làm tên nhìn giống nhau.
-    invisible_chars = (
-        "\u200b",
-        "\u200c",
-        "\u200d",
-        "\u2060",
-        "\ufeff",
-        "\u2061",
-        "\u2062",
-        "\u2063",
-        "\u2064",
-    )
-
-    for char in invisible_chars:
-        text = text.replace(
-            char,
-            ""
-        )
-
-    # Chuẩn hóa khoảng trắng.
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    )
-
-    return text
-
-
-# ============================================================
-# XÓA KÝ TỰ ĐẶC BIỆT ĐỂ SO SÁNH TÊN
-# ============================================================
-
-def identity_compact(
-    text
-):
-
-    text = normalize_identity_text(
-        text
-    )
-
-    return re.sub(
-        r"[^a-z0-9\u00c0-\u024f\u1e00-\u9fff]+",
-        "",
-        text
-    )
-
-
-# ============================================================
-# LẤY PROFILE CÁC ADMIN
-# ============================================================
-
-async def get_admin_profiles(
-    chat
-):
-
-    result = await api(
-        "getChatAdministrators",
-        {
-            "chat_id":
-                chat
-        }
-    )
-
-    if not result.get(
-        "ok"
-    ):
-
-        return []
-
-    return result.get(
-        "result",
-        []
-    )
-
-
-# ============================================================
-# PHÁT HIỆN TÊN GIẢ MẠO ADMIN
-# ============================================================
-
-async def detect_admin_impersonation(
-    message
-):
-
-    if not is_group(
-        message
-    ):
-        return False
-
-    user = from_user(
-        message
-    )
-
-    if not user:
-        return False
-
-    user_id = user.get(
-        "id"
-    )
-
-    if not user_id:
-        return False
-
-    current_name = user_full_name(
-        user
-    )
-
-    current_compact = identity_compact(
-        current_name
-    )
-
-    if not current_compact:
-        return False
-
-    admins = await get_admin_profiles(
-        chat_id(message)
-    )
-
-    for admin in admins:
-
-        admin_user = admin.get(
-            "user",
-            {}
-        )
-
-        admin_id = admin_user.get(
-            "id"
-        )
-
-        if not admin_id:
-            continue
-
-        # Bỏ qua chính admin.
-        if admin_id == user_id:
-            continue
-
-        admin_name = user_full_name(
-            admin_user
-        )
-
-        admin_compact = identity_compact(
-            admin_name
-        )
-
-        if not admin_compact:
-            continue
-
-        # Trùng hoàn toàn sau normalize.
-        if current_compact == admin_compact:
-
-            return True
-
-        # Tên rất giống nhau nhưng có thêm
-        # ký tự Unicode / khoảng trắng / ký hiệu.
-        if (
-            len(current_compact) >= 4
-            and len(admin_compact) >= 4
-        ):
-
-            if (
-                current_compact in admin_compact
-                or admin_compact in current_compact
-            ):
-
-                return True
-
-    return False
-
-
-# ============================================================
-# PHÁT HIỆN USERNAME GIẢ MẠO ADMIN
-# ============================================================
-
-async def detect_username_impersonation(
-    message
-):
-
-    if not is_group(
-        message
-    ):
-        return False
-
-    user = from_user(
-        message
-    )
-
-    if not user:
-        return False
-
-    username = (
-        user.get("username")
-        or ""
-    )
-
-    username = identity_compact(
-        username
-    )
-
-    if not username:
-        return False
-
-    admins = await get_admin_profiles(
-        chat_id(message)
-    )
-
-    for admin in admins:
-
-        admin_user = admin.get(
-            "user",
-            {}
-        )
-
-        if admin_user.get(
-            "id"
-        ) == user.get(
-            "id"
-        ):
-            continue
-
-        admin_username = identity_compact(
-            admin_user.get(
-                "username",
-                ""
+    if not row:
+        messages = 1
+        old_level = 1
+        new_level = calculate_level(messages)
+
+        db_execute(
+            """
+            INSERT INTO levels
+            (chat_id, user_id, messages, level)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                chat_id,
+                user_id,
+                messages,
+                new_level
             )
         )
 
-        if not admin_username:
-            continue
+        return old_level, new_level, messages
 
-        if username == admin_username:
-            return True
-
-        # Chỉ cảnh báo trường hợp gần giống
-        # khi tên đủ dài để giảm false positive.
-        if (
-            len(username) >= 5
-            and len(admin_username) >= 5
-        ):
-
-            if (
-                username in admin_username
-                or admin_username in username
-            ):
-                return True
-
-    return False
-
-
-# ============================================================
-# PROFILE CHANGE WARNING
-# ============================================================
-
-async def check_profile_change(
-    message
-):
-
-    if not is_group(
-        message
-    ):
-        return False
-
-    user = from_user(
-        message
+    old_level = int(
+        row["level"] or 1
     )
 
-    if not user:
-        return False
+    messages = int(
+        row["messages"] or 0
+    ) + 1
 
-    old = await get_known_profile(
-        chat_id(message),
+    new_level = calculate_level(
+        messages
+    )
+
+    db_execute(
+        """
+        UPDATE levels
+        SET messages=?, level=?
+        WHERE chat_id=? AND user_id=?
+        """,
+        (
+            messages,
+            new_level,
+            chat_id,
+            user_id
+        )
+    )
+
+    return old_level, new_level, messages
+
+
+def level_progress(messages, level):
+    """
+    Tính tiến độ đến level tiếp theo.
+    """
+
+    next_level = level + 1
+
+    if next_level not in LEVEL_THRESHOLDS:
+        return None, 100
+
+    current_required = LEVEL_THRESHOLDS[level]
+    next_required = LEVEL_THRESHOLDS[next_level]
+
+    if next_required <= current_required:
+        return next_level, 100
+
+    progress = (
+        (messages - current_required)
+        / (next_required - current_required)
+    ) * 100
+
+    progress = max(
+        0,
+        min(100, progress)
+    )
+
+    return next_level, int(progress)
+
+
+# ------------------------------------------------------------
+# XỬ LÝ LEVEL KHI CÓ MESSAGE
+# ------------------------------------------------------------
+
+def handle_level_message(message):
+    chat = message.get("chat", {})
+
+    if not is_group_chat(chat):
+        return
+
+    chat_id = chat.get("id")
+    user = message.get("from", {})
+
+    if not user:
+        return
+
+    # Bot không được tính level
+    if user.get("is_bot"):
+        return
+
+    old_level, new_level, messages = add_level_message(
+        chat_id,
+        user
+    )
+
+    # --------------------------------------------------------
+    # Thông báo khi lên level
+    # --------------------------------------------------------
+
+    if new_level > old_level:
+        send_text(
+            chat_id,
+            "🎉 <b>CHÚC MỪNG LEVEL UP!</b>\n\n"
+            f"👤 {mention_user(user)}\n"
+            f"⬆️ Đã lên <b>Level {new_level}</b>\n"
+            f"💬 Tổng tin nhắn: <b>{messages}</b>\n\n"
+            "📋 Xem nhiệm vụ tiếp theo:\n"
+            "/levelnhiemvu",
+            parse_mode="HTML"
+        )
+
+
+# ------------------------------------------------------------
+# /LEVEL
+# ------------------------------------------------------------
+
+def cmd_level(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    send_text(
+        chat_id,
+        "⭐ <b>HỆ THỐNG LEVEL NGỌC MỸ</b>\n\n"
+        "Level được tăng dựa trên số tin nhắn của thành viên "
+        "trong nhóm.\n\n"
+        "👤 /levelyou — Xem level của bạn\n"
+        "🏆 /levelbxh — Xem bảng xếp hạng\n"
+        "📋 /leveldanhsach — Điều kiện từng level\n"
+        "🎯 /levelnhiemvu — Xem nhiệm vụ level\n\n"
+        "💡 Khi đạt đủ số tin nhắn, bot sẽ tự động thông báo "
+        "khi bạn lên level.",
+        parse_mode="HTML"
+    )
+
+
+# ------------------------------------------------------------
+# /LEVELYOU
+# ------------------------------------------------------------
+
+def cmd_levelyou(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    user = message.get("from", {})
+
+    row = get_level_user(
+        chat_id,
         user.get("id")
     )
 
-    # Chưa từng thấy user.
-    if not old:
-
-        await save_known_profile(
-            chat_id(message),
-            user
+    if not row:
+        messages = 0
+        level = 1
+    else:
+        messages = int(
+            row["messages"] or 0
         )
 
-        return False
-
-    old_name = old["display_name"] or ""
-    new_name = user_full_name(
-        user
-    )
-
-    old_username = (
-        old["username"]
-        or ""
-    )
-
-    new_username = (
-        user.get("username")
-        or ""
-    )
-
-    changed = (
-        normalize_identity_text(
-            old_name
+        level = int(
+            row["level"] or 1
         )
-        != normalize_identity_text(
-            new_name
-        )
-        or
-        normalize_identity_text(
-            old_username
-        )
-        != normalize_identity_text(
-            new_username
-        )
+
+    next_level, progress = level_progress(
+        messages,
+        level
     )
 
-    await save_known_profile(
-        chat_id(message),
-        user
+    text = (
+        "⭐ <b>LEVEL CỦA BẠN</b>\n\n"
+        f"👤 {mention_user(user)}\n"
+        f"🏅 Level hiện tại: <b>{level}</b>\n"
+        f"💬 Số tin nhắn: <b>{messages}</b>\n"
     )
 
-    return changed
+    if next_level:
+        required = LEVEL_THRESHOLDS[next_level]
+
+        text += (
+            f"🎯 Level tiếp theo: <b>{next_level}</b>\n"
+            f"📈 Cần đạt: <b>{required}</b> tin nhắn\n"
+            f"📊 Tiến độ: <b>{progress}%</b>"
+        )
+    else:
+        text += (
+            "🏆 Bạn đã đạt level cao nhất "
+            "hiện tại."
+        )
+
+    send_text(
+        chat_id,
+        text,
+        parse_mode="HTML"
+    )
 
 
-# ============================================================
-# ANTIFAKE MESSAGE
-# ============================================================
+# ------------------------------------------------------------
+# /LEVELBXH
+# ------------------------------------------------------------
 
-async def handle_antifake(
-    message
-):
+def cmd_levelbxh(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
 
-    if not await get_setting(
-        chat_id(message),
-        "antifake",
-        False
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    rows = db_fetchall(
+        """
+        SELECT user_id, messages, level
+        FROM levels
+        WHERE chat_id=?
+        AND level >= 2
+        ORDER BY level DESC, messages DESC
+        LIMIT 50
+        """,
+        (chat_id,)
+    )
+
+    if not rows:
+        return send_text(
+            chat_id,
+            "🏆 Chưa có thành viên nào đạt Level 2."
+        )
+
+    lines = [
+        "🏆 <b>BẢNG XẾP HẠNG LEVEL</b>",
+        ""
+    ]
+
+    medals = {
+        1: "🥇",
+        2: "🥈",
+        3: "🥉"
+    }
+
+    for index, row in enumerate(rows, 1):
+        user_id = row["user_id"]
+        level = row["level"]
+        messages = row["messages"]
+
+        try:
+            member = tg_call(
+                "getChatMember",
+                {
+                    "chat_id": chat_id,
+                    "user_id": user_id
+                }
+            )
+
+            if member.get("ok"):
+                user = member["result"].get("user", {})
+                name = mention_user(user)
+            else:
+                name = f"<code>{user_id}</code>"
+
+        except Exception:
+            name = f"<code>{user_id}</code>"
+
+        prefix = medals.get(
+            index,
+            f"{index}."
+        )
+
+        lines.append(
+            f"{prefix} {name} — "
+            f"Level <b>{level}</b> "
+            f"({messages} tin nhắn)"
+        )
+
+    send_text(
+        chat_id,
+        "\n".join(lines),
+        parse_mode="HTML"
+    )
+
+
+# ------------------------------------------------------------
+# /LEVELDANHSACH
+# ------------------------------------------------------------
+
+def cmd_leveldanhsach(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    lines = [
+        "📋 <b>DANH SÁCH ĐIỀU KIỆN LÊN LEVEL</b>",
+        ""
+    ]
+
+    for level, required in sorted(
+        LEVEL_THRESHOLDS.items()
     ):
+        if level == 1:
+            lines.append(
+                "⭐ Level 1 — Bắt đầu"
+            )
+        else:
+            lines.append(
+                f"⭐ Level {level} — "
+                f"{required} tin nhắn"
+            )
+
+    send_text(
+        chat_id,
+        "\n".join(lines),
+        parse_mode="HTML"
+    )
+
+
+# ------------------------------------------------------------
+# /LEVELNHIEMVU
+# ------------------------------------------------------------
+
+def cmd_levelnhiemvu(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not is_group_chat(chat):
+        return send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+
+    user = message.get("from", {})
+
+    row = get_level_user(
+        chat_id,
+        user.get("id")
+    )
+
+    messages = (
+        int(row["messages"])
+        if row else 0
+    )
+
+    level = (
+        int(row["level"])
+        if row else 1
+    )
+
+    lines = [
+        "🎯 <b>NHIỆM VỤ LEVEL</b>",
+        "",
+        f"👤 {mention_user(user)}",
+        f"🏅 Level hiện tại: <b>{level}</b>",
+        f"💬 Tin nhắn: <b>{messages}</b>",
+        ""
+    ]
+
+    next_level = level + 1
+
+    if next_level in LEVEL_THRESHOLDS:
+        required = LEVEL_THRESHOLDS[next_level]
+        remaining = max(
+            0,
+            required - messages
+        )
+
+        lines.extend([
+            f"🎯 Mục tiêu Level {next_level}",
+            f"📌 Cần: <b>{required}</b> tin nhắn",
+            f"📨 Còn thiếu: <b>{remaining}</b> tin nhắn",
+            "",
+            "💡 Hãy tích cực tham gia trò chuyện "
+            "trong nhóm để tăng level."
+        ])
+    else:
+        lines.extend([
+            "🏆 Bạn đã đạt level cao nhất "
+            "trong hệ thống hiện tại."
+        ])
+
+    send_text(
+        chat_id,
+        "\n".join(lines),
+        parse_mode="HTML"
+    )
+
+
+# ------------------------------------------------------------
+# XỬ LÝ LEVEL CHO MESSAGE
+# ------------------------------------------------------------
+
+def process_level_for_message(message):
+    """
+    Gọi riêng để process_update sử dụng.
+    """
+
+    try:
+        handle_level_message(message)
+    except Exception as e:
+        logging.exception(
+            "Level error: %s",
+            e
+        )
+
+# ============================================================
+# PHẦN 8/15 — NỐI CHỮ VIỆT NAM
+# ============================================================
+
+import threading
+
+NOICHU_GAMES = {}
+NOICHU_LOCK = threading.Lock()
+
+
+def noichu_clean_text(text):
+    """Chuẩn hóa nội dung để kiểm tra nối chữ."""
+    if not text:
+        return ""
+
+    text = str(text).strip().lower()
+
+    # Bỏ dấu câu cơ bản
+    text = re.sub(r"[.,!?;:\"'“”‘’()\[\]{}<>/\\|@#$%^&*_+=~`]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+
+    return text.strip()
+
+
+def noichu_words(text):
+    """Tách câu thành các từ."""
+    text = noichu_clean_text(text)
+
+    if not text:
+        return []
+
+    return text.split()
+
+
+def noichu_last_word(text):
+    words = noichu_words(text)
+
+    if not words:
+        return ""
+
+    return words[-1]
+
+
+def noichu_first_word(text):
+    words = noichu_words(text)
+
+    if not words:
+        return ""
+
+    return words[0]
+
+
+def noichu_display_name(user):
+    if not user:
+        return "Người chơi"
+
+    first_name = user.get("first_name") or ""
+    last_name = user.get("last_name") or ""
+
+    name = f"{first_name} {last_name}".strip()
+
+    if user.get("username"):
+        return f"@{user['username']}"
+
+    return name or "Người chơi"
+
+
+def noichu_make_join_keyboard():
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "🎮 THAM GIA",
+                    "callback_data": "noichu_join"
+                }
+            ]
+        ]
+    }
+
+
+def noichu_make_game_keyboard():
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "📋 Xem người chơi",
+                    "callback_data": "noichu_players"
+                }
+            ]
+        ]
+    }
+
+
+def noichu_get_game(chat_id):
+    with NOICHU_LOCK:
+        return NOICHU_GAMES.get(int(chat_id))
+
+
+def noichu_player_exists(game, user_id):
+    return any(
+        int(player["id"]) == int(user_id)
+        for player in game.get("players", [])
+    )
+
+
+def noichu_player_index(game, user_id):
+    for index, player in enumerate(game.get("players", [])):
+        if int(player["id"]) == int(user_id):
+            return index
+
+    return -1
+
+
+def noichu_player_name_from_game(game, user_id):
+    for player in game.get("players", []):
+        if int(player["id"]) == int(user_id):
+            return player.get("name", "Người chơi")
+
+    return "Người chơi"
+
+
+def noichu_create_game(chat_id, creator):
+    game_id = f"{chat_id}_{int(time.time())}_{random.randint(1000, 9999)}"
+
+    game = {
+        "id": game_id,
+        "chat_id": int(chat_id),
+        "creator_id": int(creator.get("id", 0)),
+        "status": "waiting",
+
+        # Danh sách theo đúng thứ tự bấm tham gia
+        "players": [],
+
+        # Thứ tự chơi sau khi random
+        "order": [],
+
+        "turn_index": 0,
+
+        # Từ hiện tại
+        "current_word": "",
+
+        # Thống kê
+        "total_turns": 0,
+        "correct_turns": 0,
+
+        # Thời gian
+        "created_at": time.time(),
+        "started_at": None,
+        "last_turn_at": None,
+
+        # Thống kê từng người
+        "stats": {},
+
+        # Tin nhắn lobby
+        "lobby_message_id": None
+    }
+
+    with NOICHU_LOCK:
+        NOICHU_GAMES[int(chat_id)] = game
+
+    return game
+
+
+def noichu_add_player(game, user):
+    user_id = int(user.get("id", 0))
+
+    if not user_id:
+        return False, "Không xác định được người chơi."
+
+    if noichu_player_exists(game, user_id):
+        return False, "Bạn đã tham gia trò chơi rồi."
+
+    player = {
+        "id": user_id,
+        "name": noichu_display_name(user),
+        "username": user.get("username") or "",
+        "joined_at": time.time()
+    }
+
+    game["players"].append(player)
+
+    game["stats"][str(user_id)] = {
+        "turns": 0,
+        "correct": 0,
+        "wrong": 0,
+        "response_times": []
+    }
+
+    return True, player["name"]
+
+
+def noichu_remove_player(game, user_id):
+    user_id = int(user_id)
+
+    game["players"] = [
+        player
+        for player in game.get("players", [])
+        if int(player["id"]) != user_id
+    ]
+
+    game["order"] = [
+        player_id
+        for player_id in game.get("order", [])
+        if int(player_id) != user_id
+    ]
+
+
+def noichu_current_player_id(game):
+    order = game.get("order", [])
+
+    if not order:
+        return None
+
+    if game["turn_index"] >= len(order):
+        game["turn_index"] = 0
+
+    return int(order[game["turn_index"]])
+
+
+def noichu_next_turn(game):
+    if not game.get("order"):
+        return
+
+    game["turn_index"] += 1
+
+    if game["turn_index"] >= len(game["order"]):
+        game["turn_index"] = 0
+
+
+def noichu_make_player_list(game):
+    players = game.get("players", [])
+
+    if not players:
+        return "Chưa có người chơi nào."
+
+    lines = []
+
+    for index, player in enumerate(players, 1):
+        player_id = int(player["id"])
+
+        current_mark = ""
+
+        if (
+            game.get("status") == "playing"
+            and noichu_current_player_id(game) == player_id
+        ):
+            current_mark = " 🎯"
+
+        lines.append(
+            f"{index}. {player.get('name', 'Người chơi')}{current_mark}"
+        )
+
+    return "\n".join(lines)
+
+
+def noichu_send_players(chat_id):
+    game = noichu_get_game(chat_id)
+
+    if not game:
+        send_text(
+            chat_id,
+            "❌ Hiện tại nhóm chưa có trò chơi nối chữ."
+        )
+        return
+
+    if game["status"] == "waiting":
+        title = "🎮 DANH SÁCH NGƯỜI ĐĂNG KÝ"
+    else:
+        title = "🎮 DANH SÁCH NGƯỜI CHƠI"
+
+    text = (
+        f"{title}\n\n"
+        f"{noichu_make_player_list(game)}\n\n"
+        f"👥 Tổng: {len(game.get('players', []))} người"
+    )
+
+    send_text(chat_id, text)
+
+
+def noichu_start_game(chat_id, game_id):
+    game = noichu_get_game(chat_id)
+
+    if not game:
+        return
+
+    if game.get("id") != game_id:
+        return
+
+    if game.get("status") != "waiting":
+        return
+
+    players = list(game.get("players", []))
+
+    # Phải có ít nhất 2 người
+    if len(players) < 2:
+        game["status"] = "ended"
+
+        send_text(
+            chat_id,
+            "❌ Trò chơi nối chữ đã bị hủy.\n\n"
+            "Lý do: cần ít nhất 2 người chơi."
+        )
+
+        with NOICHU_LOCK:
+            if NOICHU_GAMES.get(int(chat_id)) is game:
+                NOICHU_GAMES.pop(int(chat_id), None)
+
+        return
+
+    # Random thứ tự chơi
+    random.shuffle(players)
+
+    game["order"] = [
+        int(player["id"])
+        for player in players
+    ]
+
+    game["turn_index"] = 0
+    game["current_word"] = ""
+    game["status"] = "playing"
+    game["started_at"] = time.time()
+    game["last_turn_at"] = time.time()
+
+    first_player = noichu_current_player_id(game)
+    first_name = noichu_player_name_from_game(game, first_player)
+
+    send_text(
+        chat_id,
+        "🔥 TRÒ CHƠI NỐI CHỮ VIỆT NAM BẮT ĐẦU!\n\n"
+        "🎲 Thứ tự người chơi đã được random.\n"
+        f"👑 Người đi đầu tiên: {first_name}\n\n"
+        "📌 Luật chơi:\n"
+        "• Người đầu tiên được nói bất kỳ từ/cụm từ hợp lệ.\n"
+        "• Người tiếp theo phải bắt đầu bằng từ cuối của lượt trước.\n"
+        "• Nói sai sẽ bị loại.\n"
+        "• Nói khi chưa tới lượt sẽ bị cảnh báo.\n"
+        "• Người cuối cùng còn lại là người chiến thắng.\n\n"
+        f"🎯 Lượt của: {first_name}"
+    )
+
+
+def noichu_schedule_start(chat_id, game_id):
+    def worker():
+        try:
+            # Chờ đúng 3 phút
+            time.sleep(180)
+
+            noichu_start_game(chat_id, game_id)
+
+        except Exception as e:
+            logging.exception(
+                "Lỗi khởi động game nối chữ: %s",
+                e
+            )
+
+    thread = threading.Thread(
+        target=worker,
+        daemon=True
+    )
+
+    thread.start()
+
+
+def cmd_noichu(message, args):
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    # Chỉ cho phép trong nhóm
+    if not is_group_chat(message):
+        send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    existing = noichu_get_game(chat_id)
+
+    if existing and existing.get("status") in ("waiting", "playing"):
+        if existing.get("status") == "waiting":
+            send_text(
+                chat_id,
+                "⚠️ Nhóm đang có một phòng nối chữ đang chờ người chơi.\n\n"
+                "Hãy bấm nút 🎮 THAM GIA ở tin nhắn phòng hiện tại."
+            )
+        else:
+            current_id = noichu_current_player_id(existing)
+            current_name = noichu_player_name_from_game(
+                existing,
+                current_id
+            )
+
+            send_text(
+                chat_id,
+                "⚠️ Nhóm đang có một ván nối chữ đang diễn ra.\n\n"
+                f"🎯 Hiện tại là lượt của: {current_name}"
+            )
+
+        return
+
+    creator = message.get("from", {})
+
+    game = noichu_create_game(
+        chat_id,
+        creator
+    )
+
+    text = (
+        "welcome đến với nối chữ Việt Nam vui lòng bấm vào nút "
+        "tham gia để vào trò chơi\n\n"
+        "🎮 NỐI CHỮ VIỆT NAM\n\n"
+        "👥 Người chơi đã tham gia: 0\n"
+        "👤 Tối thiểu: 2 người\n\n"
+        "⏰ Trò chơi sẽ bắt đầu sau 3 phút.\n"
+        "🎲 Thứ tự chơi sẽ được random khi bắt đầu.\n\n"
+        "📌 Ai bấm tham gia trước sẽ có số thứ tự đăng ký trước."
+    )
+
+    result = send_text(
+        chat_id,
+        text,
+        reply_markup=noichu_make_join_keyboard()
+    )
+
+    if isinstance(result, dict):
+        game["lobby_message_id"] = (
+            result.get("result", {}).get("message_id")
+        )
+
+    # Tự động bắt đầu sau 3 phút
+    noichu_schedule_start(
+        chat_id,
+        game["id"]
+    )
+
+
+def handle_noichu_join_callback(callback):
+    callback_id = callback.get("id")
+    from_user = callback.get("from", {})
+    message = callback.get("message", {})
+
+    chat = message.get("chat", {})
+    chat_id = chat.get("id")
+
+    if not chat_id:
+        return
+
+    game = noichu_get_game(chat_id)
+
+    if not game:
+        answer_callback_query(
+            callback_id,
+            "❌ Phòng chơi không còn tồn tại.",
+            True
+        )
+        return
+
+    if game.get("status") != "waiting":
+        answer_callback_query(
+            callback_id,
+            "❌ Trò chơi đã bắt đầu.",
+            True
+        )
+        return
+
+    user_id = int(from_user.get("id", 0))
+
+    if noichu_player_exists(game, user_id):
+        answer_callback_query(
+            callback_id,
+            "⚠️ Bạn đã tham gia rồi!",
+            True
+        )
+        return
+
+    success, result = noichu_add_player(
+        game,
+        from_user
+    )
+
+    if not success:
+        answer_callback_query(
+            callback_id,
+            result,
+            True
+        )
+        return
+
+    position = len(game["players"])
+
+    answer_callback_query(
+        callback_id,
+        f"🎮 Tham gia thành công! Bạn là người thứ {position}.",
+        False
+    )
+
+    player_list = noichu_make_player_list(game)
+
+    lobby_text = (
+        "welcome đến với nối chữ Việt Nam vui lòng bấm vào nút "
+        "tham gia để vào trò chơi\n\n"
+        "🎮 NỐI CHỮ VIỆT NAM\n\n"
+        f"👥 Người chơi: {len(game['players'])}\n\n"
+        f"{player_list}\n\n"
+        "⏰ Trò chơi sẽ bắt đầu sau 3 phút.\n"
+        "🎲 Thứ tự chơi sẽ được random khi bắt đầu."
+    )
+
+    # Cập nhật tin nhắn lobby
+    if game.get("lobby_message_id"):
+        edit_message_text(
+            chat_id,
+            game["lobby_message_id"],
+            lobby_text,
+            reply_markup=noichu_make_join_keyboard()
+        )
+
+
+def handle_noichu_players_callback(callback):
+    callback_id = callback.get("id")
+    message = callback.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+
+    if chat_id:
+        noichu_send_players(chat_id)
+
+    answer_callback_query(
+        callback_id,
+        "📋 Đã hiển thị danh sách.",
+        False
+    )
+
+
+def noichu_is_valid_move(game, text):
+    words = noichu_words(text)
+
+    if not words:
+        return False, "Bạn chưa nhập từ."
+
+    current_word = noichu_clean_text(
+        game.get("current_word", "")
+    )
+
+    # Lượt đầu tiên
+    if not current_word:
+        return True, ""
+
+    required = noichu_last_word(current_word)
+
+    first = words[0]
+
+    if first != required:
+        return (
+            False,
+            f"❌ Phải bắt đầu bằng từ: {required}"
+        )
+
+    return True, ""
+
+
+def noichu_calculate_achievement(game, user_id):
+    stats = game.get("stats", {}).get(str(user_id), {})
+
+    turns = int(stats.get("turns", 0))
+    correct = int(stats.get("correct", 0))
+    response_times = stats.get("response_times", [])
+
+    if turns <= 0:
+        return 0
+
+    accuracy = (
+        correct / turns
+    ) * 100
+
+    if response_times:
+        average_time = sum(response_times) / len(response_times)
+
+        # <= 5 giây và trả lời chính xác toàn bộ
+        # được tính 100%
+        if correct == turns and average_time <= 5:
+            return 100
+
+        speed_score = max(
+            0,
+            min(
+                100,
+                100 - int(average_time * 5)
+            )
+        )
+    else:
+        speed_score = 0
+
+    achievement = int(
+        accuracy * 0.7 +
+        speed_score * 0.3
+    )
+
+    return max(
+        0,
+        min(100, achievement)
+    )
+
+
+def noichu_finish_game(chat_id, winner_id=None):
+    game = noichu_get_game(chat_id)
+
+    if not game:
+        return
+
+    if game.get("status") == "ended":
+        return
+
+    game["status"] = "ended"
+
+    players = game.get("players", [])
+
+    if winner_id is None:
+        text = (
+            "🏁 VÁN NỐI CHỮ ĐÃ KẾT THÚC.\n\n"
+            "❌ Không còn người chơi."
+        )
+    else:
+        winner_id = int(winner_id)
+
+        winner_name = noichu_player_name_from_game(
+            game,
+            winner_id
+        )
+
+        achievement = noichu_calculate_achievement(
+            game,
+            winner_id
+        )
+
+        text = (
+            "🏆🏆🏆 KẾT THÚC TRÒ CHƠI! 🏆🏆🏆\n\n"
+            f"👑 Người chiến thắng: {winner_name}\n"
+            f"🎯 Thành tích: {achievement}%\n\n"
+        )
+
+        if achievement >= 100:
+            text += (
+                "🔥 Thành tích 100%!\n"
+                "⚡ Nhanh + chính xác + chơi tốt!"
+            )
+        elif achievement >= 80:
+            text += "🔥 Thành tích rất tốt!"
+        elif achievement >= 60:
+            text += "👍 Thành tích tốt!"
+        else:
+            text += "💪 Hãy luyện tập để đạt thành tích cao hơn!"
+
+    send_text(chat_id, text)
+
+    with NOICHU_LOCK:
+        if NOICHU_GAMES.get(int(chat_id)) is game:
+            NOICHU_GAMES.pop(int(chat_id), None)
+
+
+def handle_noichu_message(message):
+    """
+    Xử lý tin nhắn thông thường trong khi game đang diễn ra.
+    Không yêu cầu bot phải là admin.
+    """
+
+    if not is_group_chat(message):
         return False
 
-    user = from_user(
-        message
-    )
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return False
+
+    game = noichu_get_game(chat_id)
+
+    if not game:
+        return False
+
+    if game.get("status") != "playing":
+        return False
+
+    user = message.get("from", {})
 
     if not user:
         return False
 
-    # Owner không bị cảnh báo.
-    if is_owner(
-        user
-    ):
+    user_id = int(user.get("id", 0))
+
+    # Chỉ xử lý người đang tham gia
+    if not noichu_player_exists(game, user_id):
         return False
 
-    admin_name_fake = (
-        await detect_admin_impersonation(
-            message
+    current_id = noichu_current_player_id(game)
+
+    # Người chơi không tới lượt
+    if current_id != user_id:
+        current_name = noichu_player_name_from_game(
+            game,
+            current_id
         )
-    )
 
-    admin_username_fake = (
-        await detect_username_impersonation(
-            message
+        send_text(
+            chat_id,
+            f"⏳ Chưa tới lượt của bạn!\n"
+            f"🎯 Hiện tại là lượt của: {current_name}"
         )
-    )
 
-    profile_changed = (
-        await check_profile_change(
-            message
-        )
-    )
+        return True
 
-    suspicious = (
-        admin_name_fake
-        or admin_username_fake
-        or profile_changed
-    )
+    text = message.get("text", "")
 
-    if not suspicious:
+    if not text:
         return False
 
-    # Không auto-ban chỉ dựa vào profile.
-    # Chỉ gửi cảnh báo cho admin.
-    admins = await get_admin_profiles(
-        chat_id(message)
+    # Không xử lý command
+    if text.startswith("/"):
+        return False
+
+    # Kiểm tra từ
+    valid, reason = noichu_is_valid_move(
+        game,
+        text
     )
 
-    admin_mentions = []
+    player_stats = game["stats"].setdefault(
+        str(user_id),
+        {
+            "turns": 0,
+            "correct": 0,
+            "wrong": 0,
+            "response_times": []
+        }
+    )
 
-    for item in admins:
+    now = time.time()
 
-        admin_user = item.get(
-            "user",
-            {}
+    last_turn_at = game.get("last_turn_at")
+
+    if last_turn_at:
+        response_time = max(
+            0,
+            now - float(last_turn_at)
+        )
+    else:
+        response_time = 0
+
+    player_stats["turns"] += 1
+
+    game["total_turns"] += 1
+
+    if not valid:
+        player_stats["wrong"] += 1
+
+        noichu_name = noichu_player_name_from_game(
+            game,
+            user_id
         )
 
-        if admin_user.get(
-            "id"
-        ):
+        # Loại người chơi
+        noichu_remove_player(
+            game,
+            user_id
+        )
 
-            admin_mentions.append(
-                mention_user(
-                    admin_user
-                )
+        send_text(
+            chat_id,
+            f"❌ {noichu_name} đã bị loại!\n\n"
+            f"📛 Lý do: {reason}\n"
+            "🚫 Trả lời không đúng luật nối chữ."
+        )
+
+        # Nếu chỉ còn 1 người
+        if len(game.get("players", [])) == 1:
+            winner_id = int(
+                game["players"][0]["id"]
             )
 
-    reason_parts = []
+            noichu_finish_game(
+                chat_id,
+                winner_id
+            )
 
-    if admin_name_fake:
-        reason_parts.append(
-            "tên hiển thị giống admin"
+            return True
+
+        # Nếu không còn ai
+        if len(game.get("players", [])) == 0:
+            noichu_finish_game(
+                chat_id,
+                None
+            )
+
+            return True
+
+        # Người vừa bị loại có thể đang nằm trong order
+        game["order"] = [
+            player_id
+            for player_id in game["order"]
+            if int(player_id) != user_id
+        ]
+
+        if game["turn_index"] >= len(game["order"]):
+            game["turn_index"] = 0
+
+        game["last_turn_at"] = time.time()
+
+        current_id = noichu_current_player_id(game)
+
+        current_name = noichu_player_name_from_game(
+            game,
+            current_id
         )
 
-    if admin_username_fake:
-        reason_parts.append(
-            "username giống admin"
+        send_text(
+            chat_id,
+            f"🎯 Lượt tiếp theo: {current_name}"
         )
 
-    if profile_changed:
-        reason_parts.append(
-            "profile đã thay đổi"
-        )
+        return True
 
-    reason = ", ".join(
-        reason_parts
+    # Trả lời đúng
+    player_stats["correct"] += 1
+    player_stats["response_times"].append(
+        response_time
     )
 
-    text = (
-        "⚠️ <b>CẢNH BÁO ANTIFAKE</b>\n\n"
-        f"👤 Người dùng: "
-        f"{mention_user(user)}\n"
-        f"🔎 Dấu hiệu: "
-        f"{html.escape(reason)}\n\n"
-        "❗ Đây là cảnh báo tự động, "
-        "không khẳng định tài khoản là giả mạo.\n"
-        "👮 Admin hãy kiểm tra trước khi xử lý."
+    game["correct_turns"] += 1
+
+    game["current_word"] = noichu_clean_text(text)
+
+    # Sang người tiếp theo
+    noichu_next_turn(game)
+
+    game["last_turn_at"] = time.time()
+
+    current_id = noichu_current_player_id(game)
+
+    current_name = noichu_player_name_from_game(
+        game,
+        current_id
     )
 
-    await send_message(
-        chat_id(message),
-        text,
-        reply_to=message_id(message)
+    achievement = noichu_calculate_achievement(
+        game,
+        user_id
+    )
+
+    send_text(
+        chat_id,
+        f"✅ {noichu_display_name(user)} nối đúng!\n\n"
+        f"🔗 Từ vừa nói: {text.strip()}\n"
+        f"📊 Thành tích hiện tại: {achievement}%\n\n"
+        f"🎯 Lượt tiếp theo: {current_name}"
     )
 
     return True
 
 
-# ============================================================
-# ANTIBUFF - JOIN BURST
-# ============================================================
+def handle_noichu_callback(callback):
+    data = callback.get("data", "")
 
-async def record_join(
-    chat,
-    user
-):
+    if data == "noichu_join":
+        handle_noichu_join_callback(callback)
+        return True
 
-    now = time.time()
-
-    queue = JOIN_TRACKER[
-        chat
-    ]
-
-    queue.append(
-        now
-    )
-
-    # Chỉ giữ 60 giây.
-    while queue and (
-        now - queue[0] > 60
-    ):
-
-        queue.popleft()
-
-    return len(
-        queue
-    )
-
-
-async def handle_antibuff(
-    message
-):
-
-    if not await get_setting(
-        chat_id(message),
-        "antibuff",
-        False
-    ):
-        return False
+    if data == "noichu_players":
+        handle_noichu_players_callback(callback)
+        return True
 
     return False
 
 
 # ============================================================
-# PROCESS CHAT MEMBER NÂNG CAO
+# KẾT THÚC PHẦN 8/15
 # ============================================================
 
-async def process_chat_member_update(
-    update
-):
-
-    data = update.get(
-        "chat_member"
-    )
-
-    if not data:
-        return
-
-    chat = data.get(
-        "chat",
-        {}
-    )
-
-    chat_value = chat.get(
-        "id"
-    )
-
-    new_member = data.get(
-        "new_chat_member",
-        {}
-    )
-
-    old_member = data.get(
-        "old_chat_member",
-        {}
-    )
-
-    user = new_member.get(
-        "user",
-        {}
-    )
-
-    if not user:
-        return
-
-    old_status = old_member.get(
-        "status"
-    )
-
-    new_status = new_member.get(
-        "status"
-    )
-
-    was_member = old_status in {
-        "member",
-        "administrator",
-        "creator",
-        "restricted"
-    }
-
-    is_member_now = new_status in {
-        "member",
-        "administrator",
-        "creator",
-        "restricted"
-    }
-
-    # Chỉ xử lý join mới.
-    if was_member or not is_member_now:
-        return
-
-    RUNTIME_STATS[
-        "joins"
-    ] += 1
-
-    if not await get_setting(
-        chat_value,
-        "antibuff",
-        False
-    ):
-        return
-
-    count = await record_join(
-        chat_value,
-        user
-    )
-
-    # Ngưỡng join nhanh.
-    if count < 8:
-        return
-
-    # Cảnh báo admin.
-    admins = await get_admin_profiles(
-        chat_value
-    )
-
-    admin_mentions = []
-
-    for item in admins:
-
-        admin_user = item.get(
-            "user",
-            {}
-        )
-
-        if admin_user.get(
-            "id"
-        ):
-
-            admin_mentions.append(
-                mention_user(
-                    admin_user
-                )
-            )
-
-    await send_message(
-        chat_value,
-        (
-            "🚨 <b>ANTIBUFF CẢNH BÁO</b>\n\n"
-            f"👥 Có ít nhất "
-            f"<code>{count}</code> tài khoản "
-            "vừa tham gia trong khoảng 60 giây.\n\n"
-            "⚠️ Đây có thể là dấu hiệu "
-            "tăng thành viên bất thường.\n"
-            "❗ Bot không khẳng định tất cả "
-            "tài khoản đều là fake.\n\n"
-            "👮 Admin nên kiểm tra danh sách thành viên."
-        )
-    )
-
-
 # ============================================================
-# URL + SPAM PROTECTION PATCH
+# PHẦN 9/15 — TIỆN ÍCH + THÔNG TIN NHÓM
 # ============================================================
 
-async def run_message_protection(
-    message
-):
+def cmd_id(message, args):
+    """
+    /id
+    Hiển thị ID của người dùng hoặc người được reply.
+    """
 
-    if not is_group(
-        message
-    ):
-        return False
+    chat_id = message.get("chat", {}).get("id")
 
-    user = from_user(
-        message
+    if not chat_id:
+        return
+
+    target = get_reply_user(message)
+
+    if target:
+        user_id = target.get("id")
+        name = tg_username(target) or (
+            f"{target.get('first_name', '')} "
+            f"{target.get('last_name', '')}"
+        ).strip()
+
+        send_text(
+            chat_id,
+            "🆔 THÔNG TIN NGƯỜI DÙNG\n\n"
+            f"👤 Người dùng: {name or 'Không có tên'}\n"
+            f"🆔 ID: {user_id}"
+        )
+        return
+
+    user = message.get("from", {})
+
+    send_text(
+        chat_id,
+        "🆔 THÔNG TIN CỦA BẠN\n\n"
+        f"👤 Người dùng: {tg_username(user) or user.get('first_name', 'Không có tên')}\n"
+        f"🆔 ID: {user.get('id')}"
     )
 
-    if not user:
-        return False
 
-    # Owner bỏ qua protection.
-    if is_owner(
-        user
-    ):
-        return False
+def cmd_chatid(message, args):
+    """
+    /chatid
+    Hiển thị ID nhóm/chat hiện tại.
+    """
 
-    chat = chat_id(
-        message
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    chat = message.get("chat", {})
+
+    send_text(
+        chat_id,
+        "💬 THÔNG TIN CHAT\n\n"
+        f"🆔 Chat ID: {chat_id}\n"
+        f"📌 Loại: {chat.get('type', 'unknown')}\n"
+        f"📛 Tên: {chat.get('title') or chat.get('first_name') or 'Không có'}"
     )
 
-    # -----------------------------
-    # ANTISPAM
-    # -----------------------------
 
-    if await get_setting(
-        chat,
-        "antispam",
-        False
-    ):
+def cmd_info(message, args):
+    """
+    /info
+    Hiển thị thông tin người dùng.
+    """
 
-        now = time.time()
+    chat_id = message.get("chat", {}).get("id")
 
-        key = (
-            chat,
-            user.get("id")
-        )
+    if not chat_id:
+        return
 
-        queue = SPAM_TRACKER[
-            key
-        ]
+    target = get_reply_user(message)
 
-        queue.append(
-            now
-        )
+    if not target:
+        target = message.get("from", {})
 
-        while queue and (
-            now - queue[0] > 8
-        ):
+    user_id = target.get("id")
+    username = target.get("username")
+    first_name = target.get("first_name", "")
+    last_name = target.get("last_name", "")
 
-            queue.popleft()
-
-        if len(queue) >= 6:
-
-            try:
-
-                await delete_message(
-                    chat,
-                    message_id(message)
-                )
-
-                RUNTIME_STATS[
-                    "deleted"
-                ] += 1
-
-                return True
-
-            except Exception:
-                pass
-
-    # -----------------------------
-    # ANTILINK
-    # -----------------------------
-
-    if await get_setting(
-        chat,
-        "antilink",
-        False
-    ):
-
-        text = get_text(
-            message
-        )
-
-        if contains_link(
-            text
-        ):
-
-            # Admin được phép gửi link.
-            if not await is_admin(
-                message
-            ):
-
-                try:
-
-                    await delete_message(
-                        chat,
-                        message_id(message)
-                    )
-
-                    RUNTIME_STATS[
-                        "deleted"
-                    ] += 1
-
-                    return True
-
-                except Exception:
-                    pass
-
-    # -----------------------------
-    # ANTIFAKE
-    # -----------------------------
-
-    if await handle_antifake(
-        message
-    ):
-
-        # Antifake chỉ cảnh báo,
-        # không chặn message.
-        pass
-
-    # -----------------------------
-    # ANTIBUFF
-    # -----------------------------
-
-    await handle_antibuff(
-        message
-    )
-
-    return False
-
-
-# ============================================================
-# FIX FILTER RESPONSE
-# Không cho response của user phá HTML parser.
-# ============================================================
-
-async def handle_filters(
-    message
-):
-
-    if not is_group(
-        message
-    ):
-        return False
-
-    text = get_text(
-        message
+    full_name = (
+        f"{first_name} {last_name}"
     ).strip()
 
-    if not text:
-        return False
+    if not full_name:
+        full_name = "Không có tên"
 
-    rows = await get_filters(
-        chat_id(message)
+    if username:
+        username_text = f"@{username}"
+    else:
+        username_text = "Không có username"
+
+    save_known_profile(target)
+
+    send_text(
+        chat_id,
+        "👤 THÔNG TIN NGƯỜI DÙNG\n\n"
+        f"📛 Tên: {full_name}\n"
+        f"🔗 Username: {username_text}\n"
+        f"🆔 ID: {user_id}\n"
+        f"🤖 Bot: {'Có' if target.get('is_bot') else 'Không'}"
     )
 
-    if not rows:
-        return False
 
-    normalized_text = text.lower()
+def cmd_groupinfo(message, args):
+    """
+    /groupinfo
+    Thông tin nhóm.
+    """
 
-    for row in rows:
+    chat_id = message.get("chat", {}).get("id")
 
-        keyword = (
-            row["keyword"]
-            or ""
-        ).lower()
+    if not chat_id:
+        return
 
-        if not keyword:
-            continue
+    if not is_group_chat(message):
+        send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
 
-        if keyword in normalized_text:
+    chat = message.get("chat", {})
 
-            response = row[
-                "response"
-            ]
+    member_count = get_group_member_count(
+        chat_id
+    )
 
-            # Plain text để filter có thể
-            # chứa ký tự HTML mà không lỗi.
-            result = await api(
-                "sendMessage",
-                {
-                    "chat_id":
-                        chat_id(message),
+    title = chat.get("title") or "Không có tên"
 
-                    "text":
-                        str(response),
+    username = chat.get("username")
 
-                    "reply_to_message_id":
-                        message_id(message)
-                }
-            )
+    if username:
+        username_text = f"@{username}"
+    else:
+        username_text = "Không có"
 
-            if result.get(
-                "ok"
-            ):
-
-                RUNTIME_STATS[
-                    "filter_hits"
-                ] += 1
-
-            return True
-
-    return False
+    send_text(
+        chat_id,
+        "🏠 THÔNG TIN NHÓM\n\n"
+        f"📛 Tên nhóm: {title}\n"
+        f"🆔 ID nhóm: {chat_id}\n"
+        f"🔗 Username: {username_text}\n"
+        f"👥 Thành viên: {member_count}"
+    )
 
 
-# ============================================================
-# FIX MENTION PARSER
-# ============================================================
+def cmd_members(message, args):
+    """
+    /members
+    Hiển thị số thành viên.
+    """
 
-def mentioned_user_ids(
-    message
-):
+    chat_id = message.get("chat", {}).get("id")
 
-    result = []
+    if not chat_id:
+        return
 
-    text = message.get(
-        "text",
+    if not is_group_chat(message):
+        send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    count = get_group_member_count(
+        chat_id
+    )
+
+    send_text(
+        chat_id,
+        f"👥 Nhóm hiện có khoảng {count} thành viên."
+    )
+
+
+def cmd_rules(message, args):
+    """
+    /rules
+    Hiển thị nội quy cơ bản.
+    """
+
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    if not is_group_chat(message):
+        send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    rules = get_setting(
+        chat_id,
+        "group_rules",
         ""
     )
 
-    entities = (
-        message.get(
-            "entities"
+    if not rules:
+        rules = (
+            "📜 NỘI QUY NHÓM\n\n"
+            "1. Tôn trọng mọi người.\n"
+            "2. Không spam tin nhắn.\n"
+            "3. Không gửi link quảng cáo trái phép.\n"
+            "4. Không giả mạo thành viên khác.\n"
+            "5. Không sử dụng bot để phá nhóm.\n"
+            "6. Tuân thủ hướng dẫn của quản trị viên."
         )
-        or []
+
+    send_text(
+        chat_id,
+        rules
     )
 
-    for entity in entities:
 
-        entity_type = entity.get(
-            "type"
+def cmd_setrules(message, args):
+    """
+    /setrules <nội quy>
+    Quản trị viên đặt nội quy nhóm.
+    """
+
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    if not is_group_chat(message):
+        send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    if not is_admin(message):
+        send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được sử dụng lệnh này."
+        )
+        return
+
+    rules = " ".join(args).strip()
+
+    if not rules:
+        send_text(
+            chat_id,
+            "❌ Cách dùng:\n/setrules <nội quy mới>"
+        )
+        return
+
+    set_setting(
+        chat_id,
+        "group_rules",
+        rules
+    )
+
+    send_text(
+        chat_id,
+        "✅ Đã cập nhật nội quy nhóm."
+    )
+
+
+def cmd_setwelcome(message, args):
+    """
+    /setwelcome <nội dung>
+    Đặt lời chào thành viên mới.
+    """
+
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    if not is_group_chat(message):
+        send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    if not is_admin(message):
+        send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được sử dụng lệnh này."
+        )
+        return
+
+    welcome = " ".join(args).strip()
+
+    if not welcome:
+        send_text(
+            chat_id,
+            "❌ Cách dùng:\n/setwelcome <nội dung>"
+        )
+        return
+
+    set_setting(
+        chat_id,
+        "welcome_text",
+        welcome
+    )
+
+    send_text(
+        chat_id,
+        "✅ Đã lưu lời chào thành viên mới."
+    )
+
+
+def cmd_delwelcome(message, args):
+    """
+    /delwelcome
+    Xóa lời chào thành viên mới.
+    """
+
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    if not is_group_chat(message):
+        send_text(
+            chat_id,
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    if not is_admin(message):
+        send_text(
+            chat_id,
+            "❌ Chỉ quản trị viên mới được sử dụng lệnh này."
+        )
+        return
+
+    set_setting(
+        chat_id,
+        "welcome_text",
+        ""
+    )
+
+    send_text(
+        chat_id,
+        "✅ Đã xóa lời chào thành viên mới."
+    )
+
+
+def handle_new_members(message):
+    """
+    Tự động chào thành viên mới.
+    """
+
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    new_members = message.get(
+        "new_chat_members",
+        []
+    )
+
+    if not new_members:
+        return False
+
+    welcome = get_setting(
+        chat_id,
+        "welcome_text",
+        ""
+    )
+
+    for user in new_members:
+        save_known_profile(user)
+
+    if not welcome:
+        return True
+
+    names = []
+
+    for user in new_members:
+        names.append(
+            mention_user(user)
         )
 
-        if entity_type == "text_mention":
+    names_text = ", ".join(names)
 
-            mentioned = entity.get(
-                "user"
-            )
+    welcome = welcome.replace(
+        "{user}",
+        names_text
+    )
 
-            if mentioned:
+    send_text(
+        chat_id,
+        welcome
+    )
 
-                user_id = mentioned.get(
-                    "id"
-                )
+    return True
 
-                if user_id:
 
-                    result.append(
-                        user_id
-                    )
+def handle_left_member(message):
+    """
+    Xử lý thành viên rời nhóm.
+    """
 
-        elif entity_type == "mention":
+    chat_id = message.get("chat", {}).get("id")
 
-            # Telegram chỉ cung cấp username
-            # cho entity mention. Không thể dùng
-            # getChatMember trực tiếp với username.
-            # Username sẽ được tìm trong DB cache.
-            offset = entity.get(
-                "offset",
-                0
-            )
+    if not chat_id:
+        return False
 
-            length = entity.get(
-                "length",
-                0
-            )
+    left_member = message.get(
+        "left_chat_member"
+    )
 
-            username = text[
-                offset:
-                offset + length
-            ]
+    if not left_member:
+        return False
 
-            username = username.lstrip(
-                "@"
-            ).lower()
+    return True
 
-            if username:
 
-                row = awaitable_placeholder = None
+def cmd_setnick(message, args):
+    """
+    /setnick <tên>
+    Lưu tên hiển thị tùy chỉnh cho người dùng.
+    """
 
-    return result
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    user = message.get("from", {})
+
+    nickname = " ".join(args).strip()
+
+    if not nickname:
+        send_text(
+            chat_id,
+            "❌ Cách dùng:\n/setnick <tên>"
+        )
+        return
+
+    db_execute(
+        """
+        INSERT INTO users(
+            user_id,
+            username,
+            first_name,
+            last_name,
+            messages,
+            level,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, 0, 1, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            first_name = excluded.first_name,
+            updated_at = excluded.updated_at
+        """,
+        (
+            int(user.get("id", 0)),
+            user.get("username"),
+            nickname,
+            user.get("last_name"),
+            int(time.time()),
+            int(time.time())
+        )
+    )
+
+    send_text(
+        chat_id,
+        f"✅ Đã đặt tên hiển thị của bạn thành: {nickname}"
+    )
+
+
+def cmd_ping(message, args):
+    """
+    /ping
+    Kiểm tra bot còn hoạt động.
+    """
+
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    start = time.time()
+
+    result = send_text(
+        chat_id,
+        "🏓 Pong!"
+    )
+
+    elapsed = int(
+        (time.time() - start) * 1000
+    )
+
+    send_text(
+        chat_id,
+        f"⚡ Bot đang hoạt động.\n"
+        f"⏱ Phản hồi: {elapsed} ms"
+    )
+
+
+def cmd_time(message, args):
+    """
+    /time
+    Hiển thị thời gian hiện tại.
+    """
+
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    now = datetime.datetime.now()
+
+    send_text(
+        chat_id,
+        "🕐 THỜI GIAN HIỆN TẠI\n\n"
+        f"📅 Ngày: {now.strftime('%d/%m/%Y')}\n"
+        f"⏰ Giờ: {now.strftime('%H:%M:%S')}"
+    )
+
+
+def cmd_uptime(message, args):
+    """
+    /uptime
+    Hiển thị thời gian bot đã chạy.
+    """
+
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    current = time.time()
+
+    bot_started = globals().get(
+        "BOT_STARTED_AT",
+        current
+    )
+
+    seconds = max(
+        0,
+        int(current - bot_started)
+    )
+
+    days = seconds // 86400
+    seconds %= 86400
+
+    hours = seconds // 3600
+    seconds %= 3600
+
+    minutes = seconds // 60
+    seconds %= 60
+
+    parts = []
+
+    if days:
+        parts.append(f"{days} ngày")
+
+    if hours:
+        parts.append(f"{hours} giờ")
+
+    if minutes:
+        parts.append(f"{minutes} phút")
+
+    parts.append(f"{seconds} giây")
+
+    send_text(
+        chat_id,
+        "⏱ BOT UPTIME\n\n"
+        + " ".join(parts)
+    )
+
+
+def cmd_botinfo(message, args):
+    """
+    /botinfo
+    Thông tin bot Ngọc Mỹ.
+    """
+
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    send_text(
+        chat_id,
+        "🤖 NGỌC MỸ BOT\n\n"
+        "✨ Bot quản lý nhóm Telegram\n"
+        "🛡 Bảo vệ nhóm\n"
+        "🎮 Trò chơi\n"
+        "📈 Hệ thống level\n"
+        "🔥 Điểm danh\n"
+        "💬 Bộ lọc\n"
+        "🌙 AFK\n"
+        "🌸 Thơ đời / thơ tình\n"
+        "🔗 Nối chữ Việt Nam\n\n"
+        "👑 Owner: @DTN_207"
+    )
+
+
+def cmd_stats(message, args):
+    """
+    /stats
+    Thống kê tin nhắn của người dùng.
+    """
+
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    target = get_reply_user(message)
+
+    if not target:
+        target = message.get("from", {})
+
+    user_id = int(
+        target.get("id", 0)
+    )
+
+    row = db_fetchone(
+        """
+        SELECT messages, level
+        FROM users
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    if not row:
+        messages = 0
+        level = 1
+    else:
+        messages = int(
+            row["messages"] or 0
+        )
+        level = int(
+            row["level"] or 1
+        )
+
+    name = tg_username(target)
+
+    if not name:
+        name = target.get(
+            "first_name",
+            "Người dùng"
+        )
+
+    send_text(
+        chat_id,
+        "📊 THỐNG KÊ\n\n"
+        f"👤 {name}\n"
+        f"💬 Tin nhắn: {messages}\n"
+        f"⭐ Level: {level}"
+    )
 
 
 # ============================================================
-# CACHE USER PROFILE TỪ MESSAGE
+# KẾT THÚC PHẦN 9/15
 # ============================================================
 
-async def cache_message_profile(
-    message
+# ============================================================
+# PHẦN 10/15 — CALLBACK + MENU + HELP ĐẦY ĐỦ
+# ============================================================
+
+def answer_callback_query(callback_id, text="", show_alert=False):
+    if not callback_id:
+        return
+
+    tg_call(
+        "answerCallbackQuery",
+        {
+            "callback_query_id": callback_id,
+            "text": text or "",
+            "show_alert": bool(show_alert)
+        }
+    )
+
+
+def edit_message_text(
+    chat_id,
+    message_id,
+    text,
+    reply_markup=None
 ):
+    if not chat_id or not message_id:
+        return None
 
-    if not is_group(
-        message
-    ):
-        return
+    data = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": text
+    }
 
-    user = from_user(
-        message
+    if reply_markup is not None:
+        data["reply_markup"] = reply_markup
+
+    return tg_call(
+        "editMessageText",
+        data
     )
 
-    if not user:
-        return
 
-    await save_known_profile(
-        chat_id(message),
-        user
+def build_help_text():
+    return (
+        "🤖 NGỌC MỸ — DANH SÁCH LỆNH\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+
+        "📌 CƠ BẢN\n"
+        "/start — Mở menu chính.\n"
+        "/help — Xem danh sách lệnh.\n"
+        "/ping — Kiểm tra bot.\n"
+        "/time — Xem thời gian.\n"
+        "/uptime — Xem thời gian bot đã chạy.\n"
+        "/botinfo — Thông tin bot.\n"
+        "/id — Xem ID người dùng.\n"
+        "/chatid — Xem ID chat.\n"
+        "/info — Xem thông tin người dùng.\n"
+        "/stats — Xem thống kê tin nhắn/level.\n\n"
+
+        "👥 THÔNG TIN NHÓM\n"
+        "/groupinfo — Xem thông tin nhóm.\n"
+        "/members — Xem số thành viên.\n"
+        "/rules — Xem nội quy nhóm.\n"
+        "/setrules <nội dung> — Đặt nội quy nhóm.\n"
+        "/setwelcome <nội dung> — Đặt lời chào thành viên mới.\n"
+        "/delwelcome — Xóa lời chào.\n"
+        "/setnick <tên> — Đặt tên hiển thị.\n\n"
+
+        "🛡 QUẢN LÝ NHÓM\n"
+        "/ban — Cấm thành viên.\n"
+        "Cách dùng: reply tin nhắn người đó + /ban\n\n"
+        "/unban <ID> — Gỡ cấm thành viên.\n"
+        "/kick — Đuổi thành viên khỏi nhóm.\n"
+        "Cách dùng: reply tin nhắn + /kick\n\n"
+        "/mute — Tắt quyền nhắn tin.\n"
+        "Cách dùng: reply tin nhắn + /mute\n\n"
+        "/unmute — Mở quyền nhắn tin.\n"
+        "/warn — Cảnh cáo thành viên.\n"
+        "/unwarn — Gỡ cảnh cáo.\n"
+        "/promote — Thăng quản trị viên.\n"
+        "/demote — Hạ quản trị viên.\n"
+        "/pin — Ghim tin nhắn.\n"
+        "/unpin — Bỏ ghim tin nhắn.\n\n"
+
+        "🛡 BẢO VỆ NHÓM\n"
+        "/antispam on — Bật chống spam.\n"
+        "/antispam off — Tắt chống spam.\n"
+        "/antilink on — Chặn link.\n"
+        "/antilink off — Cho phép link.\n"
+        "/antibuff on — Chống buff thành viên.\n"
+        "/antibuff off — Tắt chống buff.\n"
+        "/antifake on — Chống tài khoản giả mạo.\n"
+        "/antifake off — Tắt chống fake.\n"
+        "/protect on — Bật bảo vệ tổng hợp.\n"
+        "/protect off — Tắt bảo vệ tổng hợp.\n\n"
+
+        "🌙 AFK\n"
+        "/afk <lý do> — Bật trạng thái AFK.\n"
+        "Gửi tin nhắn lại để hủy AFK.\n\n"
+
+        "🔎 FILTER\n"
+        "/filter <từ> <nội dung> — Tạo bộ lọc.\n"
+        "/filters — Xem bộ lọc.\n"
+        "/stopfilter <từ> — Xóa bộ lọc.\n\n"
+
+        "🔥 ĐIỂM DANH\n"
+        "/diemdanh — Mở điểm danh hằng ngày.\n"
+        "Bấm nút 🔥 Điểm danh để nhận streak.\n\n"
+
+        "⭐ LEVEL\n"
+        "/level — Xem hệ thống level.\n"
+        "/levelyou — Xem level của bạn.\n"
+        "/levelbxh — Xem bảng xếp hạng level.\n"
+        "/leveldanhsach — Xem điều kiện lên level.\n"
+        "/levelnhiemvu — Xem nhiệm vụ level.\n\n"
+
+        "🎮 TRÒ CHƠI\n"
+        "/noichu — Tạo phòng Nối Chữ Việt Nam.\n"
+        "Cần ít nhất 2 người chơi.\n"
+        "Phòng chờ 3 phút rồi random lượt chơi.\n"
+        "Bot không cần quyền admin để chạy trò chơi.\n\n"
+
+        "🌸 THƠ\n"
+        "/thodoi — Nhận một bài thơ đời ngẫu nhiên.\n"
+        "/thotinh — Nhận một bài thơ tình ngẫu nhiên.\n\n"
+
+        "━━━━━━━━━━━━━━━━━━\n"
+        "⚠️ Lệnh quản lý nhóm cần quyền quản trị.\n"
+        "🎮 Nối chữ có thể chơi không cần bot admin.\n"
+        "🤖 Ngọc Mỹ không sử dụng chức năng AI.\n\n"
+        "👑 Owner: @DTN_207"
     )
 
+
+def cmd_help(message, args):
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    # /help trong nhóm
+    if is_group_chat(message):
+        send_text(
+            chat_id,
+            "❌ /help chỉ được sử dụng trong tin nhắn riêng với bot."
+        )
+        return
+
+    send_text(
+        chat_id,
+        build_help_text()
+    )
+
+
+def cmd_menu(message, args):
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    if is_group_chat(message):
+        send_text(
+            chat_id,
+            "❌ Menu chỉ được sử dụng trong tin nhắn riêng với bot."
+        )
+        return
+
+    send_start_menu(
+        chat_id,
+        message.get("from", {})
+    )
+
+
+def build_main_keyboard():
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "📚 HELP",
+                    "callback_data": "menu_help"
+                },
+                {
+                    "text": "🛡 BẢO VỆ",
+                    "callback_data": "menu_protect"
+                }
+            ],
+            [
+                {
+                    "text": "👮 QUẢN LÝ",
+                    "callback_data": "menu_admin"
+                },
+                {
+                    "text": "🎮 TRÒ CHƠI",
+                    "callback_data": "menu_game"
+                }
+            ],
+            [
+                {
+                    "text": "⭐ LEVEL",
+                    "callback_data": "menu_level"
+                },
+                {
+                    "text": "🌸 THƠ",
+                    "callback_data": "menu_poem"
+                }
+            ]
+        ]
+    }
+
+
+def send_start_menu(chat_id, user=None):
+    name = "bạn"
+
+    if user:
+        name = (
+            user.get("first_name")
+            or user.get("username")
+            or "bạn"
+        )
+
+    text = (
+        f"🤖 Xin chào {name}!\n\n"
+        "🌸 Đây là bot Ngọc Mỹ.\n"
+        "🛡 Quản lý và bảo vệ nhóm Telegram.\n"
+        "🎮 Có trò chơi, level, điểm danh và thơ.\n\n"
+        "👇 Chọn chức năng bên dưới:"
+    )
+
+    return send_text(
+        chat_id,
+        text,
+        reply_markup=build_main_keyboard()
+    )
+
+
+def callback_menu_help(callback):
+    callback_id = callback.get("id")
+    message = callback.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        answer_callback_query(
+            callback_id,
+            "Không xác định được chat.",
+            True
+        )
+        return
+
+    # Menu help chủ yếu dùng trong private
+    edit_message_text(
+        chat_id,
+        message.get("message_id"),
+        build_help_text(),
+        reply_markup={
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "🔙 MENU",
+                        "callback_data": "menu_main"
+                    }
+                ]
+            ]
+        }
+    )
+
+    answer_callback_query(
+        callback_id,
+        "📚 Đã mở danh sách lệnh."
+    )
+
+
+def callback_menu_protect(callback):
+    callback_id = callback.get("id")
+    message = callback.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    text = (
+        "🛡 BẢO VỆ NHÓM\n\n"
+        "/antispam on — Chống spam.\n"
+        "/antispam off — Tắt chống spam.\n\n"
+        "/antilink on — Chặn link.\n"
+        "/antilink off — Tắt chặn link.\n\n"
+        "/antibuff on — Chống buff thành viên.\n"
+        "/antibuff off — Tắt chống buff.\n\n"
+        "/antifake on — Chống tài khoản giả.\n"
+        "/antifake off — Tắt chống fake.\n\n"
+        "/protect on — Bật bảo vệ tổng hợp.\n"
+        "/protect off — Tắt bảo vệ tổng hợp."
+    )
+
+    edit_message_text(
+        chat_id,
+        message.get("message_id"),
+        text,
+        reply_markup={
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "🔙 MENU",
+                        "callback_data": "menu_main"
+                    }
+                ]
+            ]
+        }
+    )
+
+    answer_callback_query(
+        callback_id,
+        "🛡 Bảo vệ"
+    )
+
+
+def callback_menu_admin(callback):
+    callback_id = callback.get("id")
+    message = callback.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    text = (
+        "👮 QUẢN LÝ NHÓM\n\n"
+        "/ban — Cấm thành viên.\n"
+        "/unban <ID> — Gỡ cấm.\n"
+        "/kick — Đuổi thành viên.\n"
+        "/mute — Khóa chat.\n"
+        "/unmute — Mở chat.\n"
+        "/warn — Cảnh cáo.\n"
+        "/unwarn — Gỡ cảnh cáo.\n"
+        "/promote — Thăng quản trị.\n"
+        "/demote — Hạ quản trị.\n"
+        "/pin — Ghim tin nhắn.\n"
+        "/unpin — Bỏ ghim."
+    )
+
+    edit_message_text(
+        chat_id,
+        message.get("message_id"),
+        text,
+        reply_markup={
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "🔙 MENU",
+                        "callback_data": "menu_main"
+                    }
+                ]
+            ]
+        }
+    )
+
+    answer_callback_query(
+        callback_id,
+        "👮 Quản lý"
+    )
+
+
+def callback_menu_game(callback):
+    callback_id = callback.get("id")
+    message = callback.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    text = (
+        "🎮 TRÒ CHƠI\n\n"
+        "🔗 /noichu\n"
+        "Tạo phòng Nối Chữ Việt Nam.\n\n"
+        "👥 Tối thiểu 2 người.\n"
+        "⏰ Chờ 3 phút.\n"
+        "🎲 Random thứ tự.\n"
+        "❌ Nói sai bị loại.\n"
+        "🏆 Người cuối cùng thắng."
+    )
+
+    edit_message_text(
+        chat_id,
+        message.get("message_id"),
+        text,
+        reply_markup={
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "🔙 MENU",
+                        "callback_data": "menu_main"
+                    }
+                ]
+            ]
+        }
+    )
+
+    answer_callback_query(
+        callback_id,
+        "🎮 Trò chơi"
+    )
+
+
+def callback_menu_level(callback):
+    callback_id = callback.get("id")
+    message = callback.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    text = (
+        "⭐ HỆ THỐNG LEVEL\n\n"
+        "/level — Thông tin hệ thống.\n"
+        "/levelyou — Level của bạn.\n"
+        "/levelbxh — Bảng xếp hạng.\n"
+        "/leveldanhsach — Điều kiện lên level.\n"
+        "/levelnhiemvu — Nhiệm vụ level.\n\n"
+        "📈 Level được tăng dựa trên số tin nhắn."
+    )
+
+    edit_message_text(
+        chat_id,
+        message.get("message_id"),
+        text,
+        reply_markup={
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "🔙 MENU",
+                        "callback_data": "menu_main"
+                    }
+                ]
+            ]
+        }
+    )
+
+    answer_callback_query(
+        callback_id,
+        "⭐ Level"
+    )
+
+
+def callback_menu_poem(callback):
+    callback_id = callback.get("id")
+    message = callback.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    text = (
+        "🌸 THƠ\n\n"
+        "/thodoi — Thơ đời ngẫu nhiên.\n"
+        "/thotinh — Thơ tình ngẫu nhiên.\n\n"
+        "✨ Mỗi lần dùng lệnh bot sẽ chọn một bài khác."
+    )
+
+    edit_message_text(
+        chat_id,
+        message.get("message_id"),
+        text,
+        reply_markup={
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "🔙 MENU",
+                        "callback_data": "menu_main"
+                    }
+                ]
+            ]
+        }
+    )
+
+    answer_callback_query(
+        callback_id,
+        "🌸 Thơ"
+    )
+
+
+def callback_menu_main(callback):
+    callback_id = callback.get("id")
+    message = callback.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+
+    if not chat_id:
+        return
+
+    user = callback.get("from", {})
+
+    text = (
+        f"🤖 Xin chào {user.get('first_name', 'bạn')}!\n\n"
+        "🌸 Ngọc Mỹ Bot\n"
+        "👇 Chọn chức năng:"
+    )
+
+    edit_message_text(
+        chat_id,
+        message.get("message_id"),
+        text,
+        reply_markup=build_main_keyboard()
+    )
+
+    answer_callback_query(
+        callback_id,
+        "🔙 Menu chính"
+    )
+
+
+def handle_menu_callback(callback):
+    data = callback.get("data", "")
+
+    if data == "menu_main":
+        callback_menu_main(callback)
+        return True
+
+    if data == "menu_help":
+        callback_menu_help(callback)
+        return True
+
+    if data == "menu_protect":
+        callback_menu_protect(callback)
+        return True
+
+    if data == "menu_admin":
+        callback_menu_admin(callback)
+        return True
+
+    if data == "menu_game":
+        callback_menu_game(callback)
+        return True
+
+    if data == "menu_level":
+        callback_menu_level(callback)
+        return True
+
+    if data == "menu_poem":
+        callback_menu_poem(callback)
+        return True
+
+    return False
+
+
 # ============================================================
-# FIX DISPATCH COMMAND - HỖ TRỢ CẢ 2 KIỂU HANDLER
+# KẾT THÚC PHẦN 10/15
 # ============================================================
 
-async def dispatch_command(message):
+# ============================================================
+# PHẦN 11/15 — COMMAND MAP + CALLBACK ROUTER
+# ============================================================
+
+# Toàn bộ command của Ngọc Mỹ.
+# Không có /ai và không có bất kỳ chức năng AI nào.
+
+def cmd_start(message):
+    """
+    /start - mở menu chính của Ngọc Mỹ.
+    """
+    try:
+        return send_start_menu(message)
+    except Exception:
+        logging.exception("cmd_start lỗi")
+
+        try:
+            chat_id = message["chat"]["id"]
+            send_message(
+                chat_id,
+                "❌ Không thể mở menu. Vui lòng thử lại."
+            )
+        except Exception:
+            pass
+
+        return False
+
+COMMAND_HANDLERS = {
+    # Cơ bản
+    "start": cmd_start,
+    "help": cmd_help,
+    "menu": cmd_menu,
+    "ping": cmd_ping,
+    "time": cmd_time,
+    "uptime": cmd_uptime,
+    "botinfo": cmd_botinfo,
+    "id": cmd_id,
+    "chatid": cmd_chatid,
+    "info": cmd_info,
+    "stats": cmd_stats,
+
+    # Thông tin nhóm
+    "groupinfo": cmd_groupinfo,
+    "members": cmd_members,
+    "rules": cmd_rules,
+    "setrules": cmd_setrules,
+    "setwelcome": cmd_setwelcome,
+    "delwelcome": cmd_delwelcome,
+    "setnick": cmd_setnick,
+
+    # Quản lý
+    "ban": cmd_ban,
+    "unban": cmd_unban,
+    "kick": cmd_kick,
+    "mute": cmd_mute,
+    "unmute": cmd_unmute,
+    "warn": cmd_warn,
+    "unwarn": cmd_unwarn,
+    "promote": cmd_promote,
+    "demote": cmd_demote,
+    "pin": cmd_pin,
+    "unpin": cmd_unpin,
+
+    # Bảo vệ
+    "antispam": cmd_antispam,
+    "antilink": cmd_antilink,
+    "antibuff": cmd_antibuff,
+    "antifake": cmd_antifake,
+    "protect": cmd_protect,
+
+    # AFK
+    "afk": cmd_afk,
+
+    # Filter
+    "filter": cmd_filter,
+    "filters": cmd_filters,
+    "stopfilter": cmd_stop_filter,
+
+    # Điểm danh
+    "diemdanh": cmd_diemdanh,
+
+    # Level
+    "level": cmd_level,
+    "levelyou": cmd_levelyou,
+    "levelbxh": cmd_levelbxh,
+    "leveldanhsach": cmd_leveldanhsach,
+    "levelnhiemvu": cmd_levelnhiemvu,
+
+    # Trò chơi
+    "noichu": cmd_noichu,
+
+    # Thơ
+    "thodoi": cmd_thodoi,
+    "thotinh": cmd_thotinh,
+}
+
+
+def is_known_command(command):
+    if not command:
+        return False
+
+    command = command.lower().lstrip("/")
+
+    # Telegram có thể gửi /command@BotUsername
+    if "@" in command:
+        command = command.split("@", 1)[0]
+
+    return command in COMMAND_HANDLERS
+
+
+def normalize_command(command):
+    if not command:
+        return ""
+
+    command = command.lower().strip()
+
+    if command.startswith("/"):
+        command = command[1:]
+
+    if "@" in command:
+        command = command.split("@", 1)[0]
+
+    return command
+
+
+def dispatch_command_clean(message):
+    """
+    Dispatcher duy nhất cho command.
+    Không gọi dispatcher cũ.
+    """
 
     command, args = parse_command(message)
 
     if not command:
-        return
+        return False
+
+    command = normalize_command(command)
 
     handler = COMMAND_HANDLERS.get(command)
 
     if not handler:
-        return
+        return False
 
     try:
-        # Các handler mới:
-        # handler(message, args)
-        try:
-            result = handler(message, args)
+        handler(
+            message,
+            args
+        )
 
-        except TypeError as first_error:
-
-            # Các handler cũ:
-            # handler(message)
-            try:
-                result = handler(message)
-
-            except TypeError:
-                # Nếu lỗi TypeError thực sự nằm bên trong
-                # handler thì ném lỗi gốc ra ngoài.
-                raise first_error
-
-        if asyncio.iscoroutine(result):
-            await result
+        return True
 
     except Exception as e:
-
-        logger.exception(
-            "Command /%s failed: %s",
+        logging.exception(
+            "Lỗi command /%s: %s",
             command,
             e
         )
 
-        await send_message(
-            chat_id(message),
-            (
-                "❌ <b>LỖI KHI XỬ LÝ LỆNH</b>\n\n"
-                "Bot gặp lỗi nội bộ khi thực hiện lệnh.\n"
-                f"<code>{html.escape(str(e))}</code>"
-            )
-        )
+        chat_id = message.get(
+            "chat",
+            {}
+        ).get("id")
 
-# ============================================================
-# FINAL PROFILE CACHE PATCH
-# ============================================================
-
-_previous_process_update_v8 = process_update
-
-
-async def process_update(
-    update
-):
-
-    if not isinstance(
-        update,
-        dict
-    ):
-        return
-
-    if update.get(
-        "callback_query"
-    ):
-
-        try:
-
-            await process_callback_update(
-                update
+        if chat_id:
+            send_text(
+                chat_id,
+                "❌ Đã xảy ra lỗi khi xử lý lệnh.\n"
+                "Vui lòng thử lại."
             )
 
-        except Exception as e:
+        return True
 
-            logger.exception(
-                "Callback error: %s",
-                e
-            )
 
-        return
+def dispatch_callback_clean(callback):
+    """
+    Router callback duy nhất.
+    """
 
-    if update.get(
-        "chat_member"
-    ):
+    if not callback:
+        return False
 
-        try:
+    data = callback.get("data", "")
 
-            await process_chat_member_update(
-                update
-            )
-
-        except Exception as e:
-
-            logger.exception(
-                "Chat member error: %s",
-                e
-            )
-
-        return
-
-    message = (
-        update.get("message")
-        or update.get("edited_message")
-    )
-
-    if not message:
-        return
-
-    user = from_user(
-        message
-    )
-
-    if user:
-
-        await save_user(
-            user
-        )
-
-    if is_group(
-        message
-    ):
-
-        await cache_message_profile(
-            message
-        )
-
-# ============================================================
-# LEVEL - TỰ ĐỘNG ĐẾM TIN NHẮN
-# ============================================================
-
-    if (
-            is_group(message)
-            and user
-            and not user.get("is_bot", False)
-        ):
-
-        try:
-
-            level_count, old_level, new_level = add_level_message(
-                chat_id(message),
-                user.get("id"),
-                user.get("username"),
-                user.get("first_name", "Người dùng")
-            )
-
-            # Chỉ thông báo khi vừa lên level
-            if new_level > old_level:
-
-                username = user.get("username")
-
-                if username:
-                    mention = f"@{username}"
-                else:
-                    mention = (
-                        f'<a href="tg://user?id={user.get("id")}">'
-                        f'{html.escape(user.get("first_name", "Người dùng"))}'
-                        f'</a>'
-                    )
-
-                if new_level < 10:
-
-                    await send_message(
-                        chat_id(message),
-                        (
-                            f"🎉 Chúc Mừng {mention} đã lên level {new_level}\n"
-                            f"để lên level tiếp theo vui lòng rõ lệnh /levelnhiemvu"
-                        ),
-                        parse_mode="HTML"
-                    )
-
-                else:
-
-                    await send_message(
-                        chat_id(message),
-                        (
-                            f"🏆 Chúc Mừng {mention} đã đạt LEVEL 10!\n"
-                            f"🔥 Bạn đã đạt cấp độ tối đa."
-                        ),
-                        parse_mode="HTML"
-                    )
-
-        except Exception as e:
-
-            logger.exception(
-                "LEVEL MESSAGE ERROR: %s",
-                e
-            )
-
-    RUNTIME_STATS[
-        "messages"
-    ] += 1
-
-    if is_group(
-        message
-    ):
-
-        RUNTIME_STATS[
-            "groups"
-        ] += 1
-
-    elif is_private(
-        message
-    ):
-
-        RUNTIME_STATS[
-            "private"
-        ] += 1
-
-    if (
-        user
-        and await is_bot_banned(
-            user.get("id")
-        )
-        and not is_owner(user)
-    ):
-
-        return
-
-    blocked = await run_message_protection(
-        message
-    )
-
-    if blocked:
-        return
-
-    await handle_afk_return(
-        message
-    )
-
-    await handle_afk_notification(
-        message
-    )
-
-    await handle_filters(
-        message
-    )
-
-    await dispatch_command(
-        message
-    )
-
-    await _previous_process_update_v8(
-        update
-    )
-
-# ============================================================
-# END PHẦN 9/10
-# ============================================================
-
-# ============================================================
-# THEONE BOT - PURE PYTHON VERSION
-# PHẦN 10/10
-# MAIN LOOP + KHỞI ĐỘNG BOT
-# ============================================================
-
-
-# ============================================================
-# KIỂM TRA BOT TOKEN
-# ============================================================
-
-def validate_token():
-
-    if not BOT_TOKEN:
-        raise RuntimeError(
-            "BOT_TOKEN đang trống."
-        )
-
-    if BOT_TOKEN == (
-        "DÁN_TOKEN_BOT_CỦA_BẠN_VÀO_ĐÂY"
-    ):
-        raise RuntimeError(
-            "Bạn chưa thay BOT_TOKEN "
-            "trong bot.py."
-        )
-
-
-# ============================================================
-# XÓA WEBHOOK
-# ============================================================
-
-async def delete_webhook():
-
-    result = await api(
-        "deleteWebhook",
-        {
-            "drop_pending_updates":
-                True
-        }
-    )
-
-    if result.get(
-        "ok"
-    ):
-
-        logger.info(
-            "Webhook removed."
-        )
-
-    else:
-
-        logger.warning(
-            "Không thể xóa webhook: %s",
-            result.get(
-                "description",
-                "unknown"
-            )
-        )
-
-
-# ============================================================
-# BOT COMMANDS MENU
-# ============================================================
-
-async def set_bot_commands():
-
-    commands = [
-
-        {
-            "command": "start",
-            "description": "Khởi động bot"
-        },
-
-        {
-            "command": "help",
-            "description": "Xem danh sách lệnh"
-        },
-
-        {
-            "command": "id",
-            "description": "Xem ID"
-        },
-
-        {
-            "command": "info",
-            "description": "Thông tin người dùng"
-        },
-
-        {
-            "command": "ping",
-            "description": "Kiểm tra bot"
-        },
-
-        {
-            "command": "time",
-            "description": "Xem thời gian"
-        },
-
-        {
-            "command": "stats",
-            "description": "Thống kê bot"
-        },
-
-        {
-            "command": "settings",
-            "description": "Cài đặt nhóm"
-        },
-
-        {
-            "command": "echo",
-            "description": "Lặp lại nội dung"
-        },
-
-        {
-            "command": "calc",
-            "description": "Tính toán"
-        },
-
-        {
-            "command": "search",
-            "description": "Tìm kiếm"
-        },
-
-        {
-            "command": "weather",
-            "description": "Xem thời tiết"
-        },
-
-        {
-            "command": "short",
-            "description": "Rút gọn link"
-        },
-
-        {
-            "command": "warn",
-            "description": "Cảnh cáo"
-        },
-
-        {
-            "command": "warns",
-            "description": "Xem cảnh cáo"
-        },
-
-        {
-            "command": "mute",
-            "description": "Khóa chat"
-        },
-
-        {
-            "command": "unmute",
-            "description": "Mở khóa chat"
-        },
-
-        {
-            "command": "kick",
-            "description": "Kick thành viên"
-        },
-
-        {
-            "command": "ban",
-            "description": "Ban thành viên"
-        },
-
-        {
-            "command": "unban",
-            "description": "Gỡ ban"
-        },
-
-        {
-            "command": "purge",
-            "description": "Xóa nhiều tin nhắn"
-        },
-
-        {
-            "command": "pin",
-            "description": "Ghim tin nhắn"
-        },
-
-        {
-            "command": "unpin",
-            "description": "Bỏ ghim"
-        },
-
-        {
-            "command": "lock",
-            "description": "Khóa nhóm"
-        },
-
-        {
-            "command": "unlock",
-            "description": "Mở khóa nhóm"
-        },
-
-        {
-            "command": "admins",
-            "description": "Danh sách admin"
-        },
-
-        {
-            "command": "broadcast",
-            "description": "Broadcast"
-        },
-
-        {
-            "command": "users",
-            "description": "Danh sách user"
-        },
-
-        {
-            "command": "banuser",
-            "description": "Ban user khỏi bot"
-        },
-
-        {
-            "command": "unbanuser",
-            "description": "Gỡ ban user"
-        },
-
-        {
-            "command": "restart",
-            "description": "Restart bot"
-        },
-
-        {
-            "command": "logs",
-            "description": "Xem logs"
-        },
-
-        {
-            "command": "database",
-            "description": "Thông tin database"
-        },
-
-        {
-            "command": "health",
-            "description": "Kiểm tra hệ thống"
-        },
-
-        {
-            "command": "version",
-            "description": "Xem phiên bản"
-        },
-
-        {
-            "command": "antispam",
-            "description": "Bật/tắt chống spam"
-        },
-
-        {
-            "command": "antilink",
-            "description": "Bật/tắt chống link"
-        },
-
-        {
-            "command": "antibuff",
-            "description": "Bật/tắt chống buff"
-        },
-
-        {
-            "command": "antifake",
-            "description": "Bật/tắt chống giả mạo"
-        },
-
-        {
-            "command": "afk",
-            "description": "Bật trạng thái AFK"
-        },
-
-        {
-            "command": "filter",
-            "description": "Tạo filter"
-        },
-
-        {
-            "command": "filters",
-            "description": "Danh sách filter"
-        },
-
-        {
-            "command": "stopfilter",
-            "description": "Xóa filter"
-        },
-
-        {
-            "command": "thodoi",
-            "description": "Thơ đời"
-        },
-
-        {
-            "command": "thotinh",
-            "description": "Thơ tình"
-        },
-
-        {
-            "command": "diemdanh",
-            "description": "Điểm danh"
-        }
-    ]
-
-    result = await api(
-        "setMyCommands",
-        {
-            "commands":
-                json.dumps(
-                    commands,
-                    ensure_ascii=False
-                )
-        }
-    )
-
-    if result.get(
-        "ok"
-    ):
-
-        logger.info(
-            "Telegram command menu updated."
-        )
-
-    else:
-
-        logger.warning(
-            "setMyCommands failed: %s",
-            result.get(
-                "description",
-                "unknown"
-            )
-        )
-
-
-# ============================================================
-# GET BOT INFO
-# ============================================================
-
-async def get_bot_info():
-
-    result = await api(
-        "getMe"
-    )
-
-    if not result.get(
-        "ok"
-    ):
-
-        raise RuntimeError(
-            "Không thể kết nối Telegram Bot API."
-        )
-
-    bot = result.get(
-        "result",
-        {}
-    )
-
-    logger.info(
-        "Bot username: @%s",
-        bot.get(
-            "username",
-            "unknown"
-        )
-    )
-
-    logger.info(
-        "Bot ID: %s",
-        bot.get(
-            "id",
-            "unknown"
-        )
-    )
-
-    return bot
-
-
-# ============================================================
-# XỬ LÝ UPDATE AN TOÀN
-# ============================================================
-
-async def safe_process_update(
-    update
-):
+    if not data:
+        return False
 
     try:
+        # Menu chính
+        if handle_menu_callback(callback):
+            return True
 
-        await process_update(
-            update
-        )
+        # Nối chữ
+        if handle_noichu_callback(callback):
+            return True
+
+        # Điểm danh
+        if data.startswith("checkin_"):
+            handle_checkin_callback(callback)
+            return True
+
+        return False
 
     except Exception as e:
-
-        logger.exception(
-            "Unhandled update error: %s",
+        logging.exception(
+            "Lỗi callback %s: %s",
+            data,
             e
         )
 
+        callback_id = callback.get("id")
 
-# ============================================================
-# POLLING LOOP
-# ============================================================
+        answer_callback_query(
+            callback_id,
+            "❌ Có lỗi xảy ra.",
+            True
+        )
 
-async def polling_loop():
+        return True
 
-    global LAST_UPDATE_ID
-    global BOT_RUNNING
 
-    logger.info(
-        "Starting long polling..."
+def process_new_members(message):
+    try:
+        if handle_new_members(message):
+            return True
+    except Exception as e:
+        logging.exception(
+            "Lỗi new member: %s",
+            e
+        )
+
+    return False
+
+
+def process_left_member(message):
+    try:
+        if handle_left_member(message):
+            return True
+    except Exception as e:
+        logging.exception(
+            "Lỗi left member: %s",
+            e
+        )
+
+    return False
+
+
+def process_callback_query(update):
+    callback = update.get("callback_query")
+
+    if not callback:
+        return False
+
+    return dispatch_callback_clean(
+        callback
     )
 
-    error_delay = 1
 
-    while BOT_RUNNING:
+def process_command_update(update):
+    message = update.get("message")
 
+    if not message:
+        return False
+
+    text = message.get("text", "")
+
+    if not text:
+        return False
+
+    if not text.startswith("/"):
+        return False
+
+    return dispatch_command_clean(
+        message
+    )
+
+
+def process_game_message(message):
+    """
+    Xử lý tin nhắn cho Nối Chữ.
+    """
+
+    try:
+        return handle_noichu_message(
+            message
+        )
+    except Exception as e:
+        logging.exception(
+            "Lỗi Nối Chữ: %s",
+            e
+        )
+
+    return False
+
+
+def process_extra_message(message):
+    """
+    Xử lý AFK, filter, antispam, antilink,
+    antibuff, antifake và level.
+    """
+
+    try:
+        # Không xử lý command như tin nhắn game/bảo vệ
+        text = message.get("text", "")
+
+        if text and text.startswith("/"):
+            return False
+
+        # Nối chữ trước
+        if process_game_message(message):
+            return True
+
+        # AFK
+        if handle_afk_message(message):
+            return True
+
+        # Filter
+        if handle_filter_message(message):
+            return True
+
+        # Protection
+        if handle_protection(message):
+            return True
+
+        # Level
+        if process_level_for_message(message):
+            return True
+
+        # Các feature phụ
+        if handle_extra_message_features(message):
+            return True
+
+    except Exception as e:
+        logging.exception(
+            "Lỗi xử lý message: %s",
+            e
+        )
+
+    return False
+
+
+def process_message_update(update):
+    message = update.get("message")
+
+    if not message:
+        return False
+
+    # Lưu profile người dùng
+    user = message.get("from")
+
+    if user:
         try:
+            save_known_profile(user)
+        except Exception:
+            pass
 
-            offset = None
+    # Thành viên mới
+    if message.get("new_chat_members"):
+        process_new_members(message)
+        return True
 
-            if LAST_UPDATE_ID:
-                offset = (
-                    LAST_UPDATE_ID
-                    + 1
-                )
+    # Thành viên rời
+    if message.get("left_chat_member"):
+        process_left_member(message)
+        return True
 
-            result = await get_updates(
-                offset=offset,
-                timeout=30
+    # Command
+    text = message.get("text", "")
+
+    if text and text.startswith("/"):
+        return process_command_update(
+            update
+        )
+
+    # Tin nhắn thông thường
+    return process_extra_message(
+        message
+    )
+
+
+def process_update_clean(update):
+    """
+    Bộ xử lý update mới.
+    Chỉ xử lý MỘT lần mỗi update.
+    """
+
+    if not isinstance(update, dict):
+        return False
+
+    try:
+        # Callback
+        if update.get("callback_query"):
+            return process_callback_query(
+                update
             )
 
-            if not result.get(
-                "ok"
-            ):
+        # Message
+        if update.get("message"):
+            return process_message_update(
+                update
+            )
 
-                logger.warning(
-                    "getUpdates failed: %s",
-                    result.get(
-                        "description",
-                        "unknown"
-                    )
-                )
+        return False
 
-                await asyncio.sleep(
-                    error_delay
-                )
+    except Exception as e:
+        logging.exception(
+            "Lỗi process update: %s",
+            e
+        )
 
-                error_delay = min(
-                    error_delay * 2,
-                    30
-                )
+        return False
 
-                continue
 
-            error_delay = 1
+# ============================================================
+# KIỂM TRA COMMAND MAP
+# ============================================================
 
-            updates = result.get(
-                "result",
-                []
+EXPECTED_COMMANDS = [
+    "start",
+    "help",
+    "menu",
+
+    "ping",
+    "time",
+    "uptime",
+    "botinfo",
+    "id",
+    "chatid",
+    "info",
+    "stats",
+
+    "groupinfo",
+    "members",
+    "rules",
+    "setrules",
+    "setwelcome",
+    "delwelcome",
+    "setnick",
+
+    "ban",
+    "unban",
+    "kick",
+    "mute",
+    "unmute",
+    "warn",
+    "unwarn",
+    "promote",
+    "demote",
+    "pin",
+    "unpin",
+
+    "antispam",
+    "antilink",
+    "antibuff",
+    "antifake",
+    "protect",
+
+    "afk",
+
+    "filter",
+    "filters",
+    "stopfilter",
+
+    "diemdanh",
+
+    "level",
+    "levelyou",
+    "levelbxh",
+    "leveldanhsach",
+    "levelnhiemvu",
+
+    "noichu",
+
+    "thodoi",
+    "thotinh",
+]
+
+
+def validate_command_map():
+    missing = []
+
+    for command in EXPECTED_COMMANDS:
+        if command not in COMMAND_HANDLERS:
+            missing.append(command)
+
+    # Cố tình kiểm tra AI không được xuất hiện
+    forbidden_ai_commands = [
+        "ai",
+        "askai",
+        "chatgpt",
+        "openai"
+    ]
+
+    ai_found = [
+        command
+        for command in forbidden_ai_commands
+        if command in COMMAND_HANDLERS
+    ]
+
+    if missing:
+        logging.error(
+            "COMMAND BỊ THIẾU: %s",
+            ", ".join(missing)
+        )
+
+    if ai_found:
+        logging.error(
+            "PHÁT HIỆN COMMAND AI: %s",
+            ", ".join(ai_found)
+        )
+
+        for command in ai_found:
+            COMMAND_HANDLERS.pop(
+                command,
+                None
+            )
+
+    return (
+        len(missing) == 0
+        and len(ai_found) == 0
+    )
+
+
+# ============================================================
+# KẾT THÚC PHẦN 11/15
+# ============================================================
+
+# ============================================================
+# PHẦN 12/15 — POLLING TELEGRAM + CHỐNG TRÙNG UPDATE
+# ============================================================
+
+BOT_STARTED_AT = time.time()
+
+# Lưu update_id đã xử lý để tránh một update chạy nhiều lần.
+PROCESSED_UPDATE_IDS = set()
+
+# Giới hạn số update lưu trong bộ nhớ.
+MAX_PROCESSED_UPDATES = 5000
+
+# Lock chống hai luồng xử lý cùng một update.
+UPDATE_LOCK = threading.Lock()
+
+
+def is_update_processed(update_id):
+    if update_id is None:
+        return False
+
+    try:
+        update_id = int(update_id)
+    except Exception:
+        return False
+
+    with UPDATE_LOCK:
+        return update_id in PROCESSED_UPDATE_IDS
+
+
+def mark_update_processed(update_id):
+    if update_id is None:
+        return
+
+    try:
+        update_id = int(update_id)
+    except Exception:
+        return
+
+    with UPDATE_LOCK:
+        PROCESSED_UPDATE_IDS.add(update_id)
+
+        # Không để bộ nhớ phình vô hạn.
+        if len(PROCESSED_UPDATE_IDS) > MAX_PROCESSED_UPDATES:
+            remove_count = (
+                len(PROCESSED_UPDATE_IDS)
+                - MAX_PROCESSED_UPDATES
+            )
+
+            # set không có thứ tự nên chỉ cần bỏ một phần tử.
+            for _ in range(remove_count):
+                try:
+                    PROCESSED_UPDATE_IDS.pop()
+                except KeyError:
+                    break
+
+
+def get_updates(offset=None, timeout=30):
+    """
+    Lấy update từ Telegram.
+    """
+
+    data = {
+        "timeout": int(timeout),
+        "allowed_updates": [
+            "message",
+            "callback_query"
+        ]
+    }
+
+    if offset is not None:
+        data["offset"] = int(offset)
+
+    return tg_call(
+        "getUpdates",
+        data
+    )
+
+def tg_call(method, data=None, timeout=30):
+    return telegram_request(
+        method,
+        data=data,
+        timeout=timeout
+    )
+
+def delete_webhook():
+    """
+    Xóa webhook để bot sử dụng polling.
+    """
+
+    try:
+        result = tg_call(
+            "deleteWebhook",
+            {
+                "drop_pending_updates": False
+            }
+        )
+
+        return bool(result)
+
+    except Exception as e:
+        logging.exception(
+            "Không thể xóa webhook: %s",
+            e
+        )
+
+        return False
+
+
+def get_bot_information():
+    """
+    Kiểm tra token và thông tin bot.
+    """
+
+    try:
+        result = tg_call(
+            "getMe",
+            {}
+        )
+
+        if not result:
+            return None
+
+        if isinstance(result, dict):
+            return result.get(
+                "result"
+            )
+
+        return None
+
+    except Exception as e:
+        logging.exception(
+            "getMe lỗi: %s",
+            e
+        )
+
+        return None
+
+
+def process_update_once(update):
+    """
+    Chỉ xử lý một update đúng một lần.
+    """
+
+    if not isinstance(update, dict):
+        return False
+
+    update_id = update.get(
+        "update_id"
+    )
+
+    # Telegram luôn có update_id.
+    # Nếu không có thì vẫn xử lý để tránh bỏ update hợp lệ
+    # từ những nguồn test nội bộ.
+    if update_id is not None:
+        if is_update_processed(update_id):
+            logging.debug(
+                "Bỏ qua update trùng: %s",
+                update_id
+            )
+            return False
+
+        mark_update_processed(
+            update_id
+        )
+
+    return process_update_clean(
+        update
+    )
+
+
+def polling_loop():
+    """
+    Vòng lặp polling duy nhất.
+
+    Quan trọng:
+    - Không gọi process_update cũ.
+    - Không gọi _original_process_update.
+    - Không gọi wrapper cũ.
+    - Chỉ gọi process_update_once().
+    """
+
+    if not BOT_TOKEN:
+        logging.error(
+            "BOT_TOKEN chưa được cấu hình."
+        )
+
+        print(
+            "❌ LỖI: Chưa có BOT_TOKEN."
+        )
+
+        return
+
+    logging.info(
+        "Đang kiểm tra bot..."
+    )
+
+    bot_info = get_bot_information()
+
+    if not bot_info:
+        logging.error(
+            "BOT_TOKEN không hợp lệ hoặc Telegram không phản hồi."
+        )
+
+        print(
+            "❌ Không thể kết nối Telegram."
+        )
+
+        return
+
+    bot_username = bot_info.get(
+        "username",
+        ""
+    )
+
+    bot_first_name = bot_info.get(
+        "first_name",
+        "Ngọc Mỹ"
+    )
+
+    logging.info(
+        "Bot đã kết nối: %s (@%s)",
+        bot_first_name,
+        bot_username
+    )
+
+    print(
+        f"🤖 {bot_first_name}"
+        + (
+            f" (@{bot_username})"
+            if bot_username
+            else ""
+        )
+        + " đang chạy..."
+    )
+
+    # Polling không dùng webhook.
+    delete_webhook()
+
+    # Offset riêng của polling.
+    next_offset = None
+
+    while True:
+        try:
+            updates = get_updates(
+                offset=next_offset,
+                timeout=30
             )
 
             if not updates:
                 continue
 
-            for update in updates:
+            # tg_call() thường trả về dict Telegram.
+            if isinstance(updates, dict):
+                updates_list = updates.get(
+                    "result",
+                    []
+                )
+            else:
+                updates_list = updates
+
+            if not isinstance(
+                updates_list,
+                list
+            ):
+                continue
+
+            for update in updates_list:
+
+                if not isinstance(
+                    update,
+                    dict
+                ):
+                    continue
 
                 update_id = update.get(
                     "update_id"
                 )
 
-                if (
-                    update_id is not None
-                    and update_id > LAST_UPDATE_ID
-                ):
+                # Luôn tiến offset lên sau khi Telegram
+                # đã trả update.
+                if update_id is not None:
+                    try:
+                        candidate = int(
+                            update_id
+                        ) + 1
 
-                    LAST_UPDATE_ID = (
-                        update_id
+                        if (
+                            next_offset is None
+                            or candidate > next_offset
+                        ):
+                            next_offset = candidate
+
+                    except Exception:
+                        pass
+
+                try:
+                    process_update_once(
+                        update
                     )
 
-                await safe_process_update(
-                    update
-                )
+                except Exception as e:
+                    logging.exception(
+                        "Lỗi xử lý update %s: %s",
+                        update_id,
+                        e
+                    )
 
         except KeyboardInterrupt:
+            logging.info(
+                "Bot đã được dừng bằng bàn phím."
+            )
 
-            BOT_RUNNING = False
-
-            logger.info(
-                "KeyboardInterrupt."
+            print(
+                "\n🛑 Bot đã dừng."
             )
 
             break
 
         except Exception as e:
-
-            logger.exception(
+            logging.exception(
                 "Polling error: %s",
                 e
             )
 
-            await asyncio.sleep(
-                error_delay
+            print(
+                f"⚠️ Polling lỗi: {e}"
             )
 
-            error_delay = min(
-                error_delay * 2,
-                30
+            # Không thoát bot khi mạng chập chờn.
+            time.sleep(3)
+
+
+def run_bot():
+    """
+    Hàm khởi động chính.
+    """
+
+    global BOT_STARTED_AT
+
+    BOT_STARTED_AT = time.time()
+
+    print(
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
+
+    print(
+        "🤖 NGỌC MỸ BOT"
+    )
+
+    print(
+        "🛡 Telegram Group Manager"
+    )
+
+    print(
+        "🎮 Nối Chữ Việt Nam"
+    )
+
+    print(
+        "⭐ Level System"
+    )
+
+    print(
+        "🔥 Điểm Danh"
+    )
+
+    print(
+        "🌸 Thơ Đời / Thơ Tình"
+    )
+
+    print(
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
+
+    print(
+        "🤖 Chế độ AI: ĐÃ TẮT"
+    )
+
+    print(
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
+
+    # Kiểm tra command map.
+    if not validate_command_map():
+        logging.warning(
+            "Command map chưa hoàn chỉnh."
+        )
+
+    # Khởi tạo database.
+    try:
+        init_db()
+    except Exception as e:
+        logging.exception(
+            "Không thể khởi tạo database: %s",
+            e
+        )
+
+    # Bắt đầu polling.
+    polling_loop()
+
+
+# ============================================================
+# KẾT THÚC PHẦN 12/15
+# ============================================================
+
+# ============================================================
+# PHẦN 13/15
+# DATABASE MIGRATION + COMPATIBILITY
+# ============================================================
+
+def db_fetchall(sql, params=()):
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.execute(sql, params)
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
+def ensure_db_column(table, column, definition):
+    """
+    Tự động thêm cột nếu database cũ chưa có.
+    Không xóa dữ liệu cũ.
+    """
+    allowed_tables = {
+        "users",
+        "known_profiles",
+        "levels",
+        "settings",
+        "warns",
+        "filters",
+        "afk",
+        "checkins",
+        "bot_bans",
+    }
+
+    if table not in allowed_tables:
+        return
+
+    try:
+        columns = db_fetchall(f"PRAGMA table_info({table})")
+
+        exists = False
+        for row in columns:
+            try:
+                name = row["name"]
+            except Exception:
+                name = row[1]
+
+            if name == column:
+                exists = True
+                break
+
+        if not exists:
+            db_execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} {definition}"
             )
 
+    except Exception as e:
+        logging.exception(
+            "Không thể kiểm tra/thêm cột %s.%s: %s",
+            table,
+            column,
+            e
+        )
+
+
+def migrate_database():
+    """
+    Đồng bộ database cũ với phiên bản bot mới.
+    Không xóa dữ liệu.
+    """
+
+    # users
+    ensure_db_column("users", "last_name", "TEXT")
+    ensure_db_column("users", "username", "TEXT")
+    ensure_db_column("users", "first_name", "TEXT")
+    ensure_db_column("users", "messages", "INTEGER DEFAULT 0")
+    ensure_db_column("users", "level", "INTEGER DEFAULT 1")
+    ensure_db_column("users", "created_at", "TEXT")
+    ensure_db_column("users", "updated_at", "TEXT")
+
+    # known_profiles
+    ensure_db_column("known_profiles", "username", "TEXT")
+    ensure_db_column("known_profiles", "first_name", "TEXT")
+    ensure_db_column("known_profiles", "last_name", "TEXT")
+    ensure_db_column("known_profiles", "updated_at", "TEXT")
+
+    # settings
+    ensure_db_column("settings", "value", "TEXT")
+
+    # afk
+    ensure_db_column("afk", "reason", "TEXT")
+    ensure_db_column("afk", "created_at", "TEXT")
+
+    # checkins
+    ensure_db_column("checkins", "streak", "INTEGER DEFAULT 0")
+    ensure_db_column("checkins", "last_date", "TEXT")
+
+    # filters
+    ensure_db_column("filters", "response", "TEXT")
+
+    # warns
+    ensure_db_column("warns", "count", "INTEGER DEFAULT 0")
+
+    logging.info("Database migration hoàn tất.")
+
+
+def initialize_database_safe():
+    """
+    Khởi tạo database an toàn.
+    """
+
+    try:
+        init_db()
+    except Exception:
+        logging.exception("Lỗi init database")
+        raise
+
+    try:
+        migrate_database()
+    except Exception:
+        logging.exception("Lỗi migrate database")
+
+
+# ------------------------------------------------------------
+# DATABASE COMPATIBILITY HELPERS
+# ------------------------------------------------------------
+
+def db_get_setting_safe(chat_id, key, default=None):
+    try:
+        value = get_setting(chat_id, key)
+        if value is None:
+            return default
+        return value
+    except Exception:
+        return default
+
+
+def db_set_setting_safe(chat_id, key, value):
+    try:
+        set_setting(chat_id, key, value)
+        return True
+    except Exception:
+        logging.exception(
+            "Không thể lưu setting chat=%s key=%s",
+            chat_id,
+            key
+        )
+        return False
+
+
+# ------------------------------------------------------------
+# SAFE USER PROFILE
+# ------------------------------------------------------------
+
+def safe_update_user_profile(message):
+    """
+    Lưu thông tin user nhưng không để lỗi profile
+    làm hỏng toàn bộ message.
+    """
+
+    try:
+        user = message.get("from") or {}
+
+        user_id = user.get("id")
+        if not user_id:
+            return
+
+        username = user.get("username") or ""
+        first_name = user.get("first_name") or ""
+        last_name = user.get("last_name") or ""
+
+        now = datetime.datetime.now().isoformat()
+
+        db_execute(
+            """
+            INSERT OR IGNORE INTO users
+            (
+                user_id,
+                username,
+                first_name,
+                last_name,
+                messages,
+                level,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, 0, 1, ?, ?)
+            """,
+            (
+                user_id,
+                username,
+                first_name,
+                last_name,
+                now,
+                now,
+            )
+        )
+
+        db_execute(
+            """
+            UPDATE users
+            SET
+                username = ?,
+                first_name = ?,
+                last_name = ?,
+                updated_at = ?
+            WHERE user_id = ?
+            """,
+            (
+                username,
+                first_name,
+                last_name,
+                now,
+                user_id,
+            )
+        )
+
+    except Exception:
+        logging.exception("safe_update_user_profile lỗi")
+
+
+# ------------------------------------------------------------
+# SAFE GROUP CHECK
+# ------------------------------------------------------------
+
+def is_group_chat_safe(message):
+    try:
+        chat = message.get("chat") or {}
+        chat_type = chat.get("type")
+
+        return chat_type in (
+            "group",
+            "supergroup",
+        )
+
+    except Exception:
+        return False
+
+
+def require_group_safe(message):
+    """
+    Kiểm tra command có được dùng trong group hay không.
+    """
+
+    if is_group_chat_safe(message):
+        return True
+
+    send_message(
+        message["chat"]["id"],
+        "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+    )
+
+    return False
+
+
+# ------------------------------------------------------------
+# CALLBACK ROUTER BỔ SUNG
+# ------------------------------------------------------------
+
+def dispatch_callback_final(callback_query):
+    """
+    Router callback cuối cùng.
+    Hỗ trợ toàn bộ nút của bot.
+    """
+
+    try:
+        data = callback_query.get("data") or ""
+
+        # Điểm danh
+        if data.startswith("checkin"):
+            return handle_checkin_callback(callback_query)
+
+        # Nối chữ
+        if data.startswith("noichu"):
+            return handle_noichu_callback(callback_query)
+
+        # Menu chính
+        if data.startswith("menu_"):
+            return handle_menu_callback(callback_query)
+
+        # Callback menu cũ
+        if data in {
+            "help",
+            "admin",
+            "protect",
+            "game",
+            "level",
+            "poem",
+            "start_help",
+            "start_admin",
+            "start_protect",
+            "start_game",
+            "start_level",
+            "start_poem",
+        }:
+            return handle_menu_callback(callback_query)
+
+        # Nếu callback không thuộc nhóm trên
+        answer_callback_query(
+            callback_query.get("id"),
+            "❌ Nút này không còn hiệu lực."
+        )
+
+        return False
+
+    except Exception:
+        logging.exception("dispatch_callback_final lỗi")
+
+        try:
+            answer_callback_query(
+                callback_query.get("id"),
+                "❌ Có lỗi khi xử lý nút."
+            )
+        except Exception:
+            pass
+
+        return False
+
+
+# ------------------------------------------------------------
+# PATCH CALLBACK PROCESSOR
+# ------------------------------------------------------------
+
+def process_callback_query_final(callback_query):
+    try:
+        if not callback_query:
+            return False
+
+        callback_id = callback_query.get("id")
+
+        try:
+            if callback_id:
+                answer_callback_query(callback_id)
+        except Exception:
+            pass
+
+        return dispatch_callback_final(callback_query)
+
+    except Exception:
+        logging.exception("process_callback_query_final lỗi")
+        return False
+
+
+# ------------------------------------------------------------
+# PATCH MESSAGE PREPROCESSOR
+# ------------------------------------------------------------
+
+def preprocess_message(message):
+    """
+    Chuẩn hóa message trước khi đưa vào command/game/protection.
+    """
+
+    if not isinstance(message, dict):
+        return False
+
+    try:
+        chat = message.get("chat") or {}
+        user = message.get("from") or {}
+
+        if not chat.get("id"):
+            return False
+
+        # Lưu profile
+        safe_update_user_profile(message)
+
+        # Nếu là group thì lưu profile chống fake
+        if chat.get("type") in ("group", "supergroup"):
+            try:
+                save_known_profile(message)
+            except Exception:
+                pass
+
+        return True
+
+    except Exception:
+        logging.exception("preprocess_message lỗi")
+        return False
+
+
+# ------------------------------------------------------------
+# PATCH UPDATE PROCESSOR
+# ------------------------------------------------------------
+
+def process_update_final(update):
+    """
+    Bộ xử lý update cuối cùng.
+    Mỗi update chỉ được xử lý một lần.
+    """
+
+    if not isinstance(update, dict):
+        return False
+
+    update_id = update.get("update_id")
+
+    try:
+        # Chặn update trùng
+        if update_id is not None:
+            if is_update_processed(update_id):
+                return False
+
+            mark_update_processed(update_id)
+
+        # Callback
+        callback_query = update.get("callback_query")
+
+        if callback_query:
+            return process_callback_query_final(callback_query)
+
+        # Message
+        message = update.get("message")
+
+        if message:
+            preprocess_message(message)
+
+            return process_message_update(message)
+
+        # Edited message
+        edited_message = update.get("edited_message")
+
+        if edited_message:
+            preprocess_message(edited_message)
+
+            return process_message_update(edited_message)
+
+        return False
+
+    except Exception:
+        logging.exception(
+            "process_update_final lỗi update_id=%s",
+            update_id
+        )
+        return False
+
+
+# ------------------------------------------------------------
+# FINAL UPDATE ALIAS
+# ------------------------------------------------------------
+
+# Chỉ thay reference, không tạo thêm polling loop.
+process_update = process_update_final
+
+
+# ------------------------------------------------------------
+# KIỂM TRA COMMAND MAP
+# ------------------------------------------------------------
+
+def final_command_check():
+    """
+    Kiểm tra các command quan trọng đã được đăng ký.
+    """
+
+    required_commands = [
+        "start",
+        "help",
+
+        # moderation
+        "ban",
+        "unban",
+        "kick",
+        "mute",
+        "unmute",
+        "warn",
+        "unwarn",
+        "promote",
+        "demote",
+        "pin",
+        "unpin",
+
+        # protection
+        "antispam",
+        "antilink",
+        "antibuff",
+        "antifake",
+        "protect",
+
+        # AFK / filter
+        "afk",
+        "filter",
+        "filters",
+        "stopfilter",
+
+        # poetry
+        "thodoi",
+        "thotinh",
+
+        # checkin
+        "diemdanh",
+
+        # level
+        "level",
+        "levelyou",
+        "levelbxh",
+        "leveldanhsach",
+        "levelnhiemvu",
+
+        # game
+        "noichu",
+
+        # utilities
+        "id",
+        "chatid",
+        "info",
+        "groupinfo",
+        "members",
+        "rules",
+        "setrules",
+        "setwelcome",
+        "delwelcome",
+        "setnick",
+        "ping",
+        "time",
+        "uptime",
+        "botinfo",
+        "stats",
+    ]
+
+    missing = []
+
+    for command in required_commands:
+        if command not in COMMAND_HANDLERS:
+            missing.append(command)
+
+    if missing:
+        logging.warning(
+            "Command chưa đăng ký: %s",
+            ", ".join(missing)
+        )
+        return False
+
+    logging.info(
+        "Đã kiểm tra %d command.",
+        len(required_commands)
+    )
+
+    return True
+
+
+# ------------------------------------------------------------
+# STARTUP DATABASE CHECK
+# ------------------------------------------------------------
+
+try:
+    initialize_database_safe()
+except Exception:
+    logging.exception(
+        "Không thể khởi tạo database lúc import."
+    )
+
+
+# ------------------------------------------------------------
+# STARTUP COMMAND CHECK
+# ------------------------------------------------------------
+
+try:
+    final_command_check()
+except Exception:
+    logging.exception(
+        "Không thể kiểm tra command map."
+    )
+
+
+print("============================================")
+print("        NGỌC MỸ TELEGRAM BOT")
+print("        AI: ĐÃ XÓA HOÀN TOÀN")
+print("        DATABASE: READY")
+print("        COMMANDS: READY")
+print("============================================")
 
 # ============================================================
-# SHUTDOWN
+# PHẦN 14/15
+# FINAL SAFETY + ERROR HANDLING + HEALTH CHECK
 # ============================================================
 
-async def shutdown():
+def safe_send_message(chat_id, text_value, **kwargs):
+    """
+    Gửi tin nhắn an toàn.
+    Nếu Telegram từ chối HTML thì thử gửi text thường.
+    """
 
-    global BOT_RUNNING
+    if not chat_id:
+        return None
 
-    BOT_RUNNING = False
+    try:
+        return send_message(
+            chat_id,
+            text_value,
+            **kwargs
+        )
 
-    logger.info(
-        "THEONE BOT shutting down..."
+    except Exception as e:
+        logging.warning(
+            "safe_send_message lỗi: %s",
+            e
+        )
+
+        try:
+            clean_text = re.sub(
+                r"<[^>]+>",
+                "",
+                str(text_value)
+            )
+
+            return send_message(
+                chat_id,
+                clean_text
+            )
+
+        except Exception:
+            logging.exception(
+                "Không thể gửi message"
+            )
+            return None
+
+
+def safe_edit_message(chat_id, message_id, text_value, **kwargs):
+    """
+    Edit message an toàn.
+    """
+
+    try:
+        return edit_message_text(
+            chat_id,
+            message_id,
+            text_value,
+            **kwargs
+        )
+
+    except Exception:
+        logging.exception(
+            "Không thể edit message"
+        )
+        return None
+
+
+# ------------------------------------------------------------
+# ERROR REPORT
+# ------------------------------------------------------------
+
+def report_internal_error(message, error=None):
+    """
+    Không để lỗi Python lộ ra cho thành viên nhóm.
+    """
+
+    try:
+        chat = message.get("chat") or {}
+        chat_id = chat.get("id")
+
+        if not chat_id:
+            return
+
+        safe_send_message(
+            chat_id,
+            "❌ Đã xảy ra lỗi khi xử lý lệnh."
+        )
+
+        if error:
+            logging.exception(
+                "Internal bot error: %s",
+                error
+            )
+
+    except Exception:
+        logging.exception(
+            "report_internal_error lỗi"
+        )
+
+
+# ------------------------------------------------------------
+# MESSAGE HANDLER CUỐI
+# ------------------------------------------------------------
+
+def process_message_update_final(message):
+    """
+    Xử lý một message theo đúng thứ tự:
+
+    1. Thành viên mới
+    2. Thành viên rời nhóm
+    3. Command
+    4. Nối chữ
+    5. AFK
+    6. Filter
+    7. Protection
+    8. Level
+    """
+
+    if not isinstance(message, dict):
+        return False
+
+    try:
+        chat = message.get("chat") or {}
+
+        if not chat.get("id"):
+            return False
+
+        # ----------------------------------------------------
+        # NEW MEMBERS
+        # ----------------------------------------------------
+        if message.get("new_chat_members"):
+            try:
+                process_new_members(message)
+            except Exception:
+                logging.exception(
+                    "process_new_members lỗi"
+                )
+
+            return True
+
+        # ----------------------------------------------------
+        # LEFT MEMBER
+        # ----------------------------------------------------
+        if message.get("left_chat_member"):
+            try:
+                process_left_member(message)
+            except Exception:
+                logging.exception(
+                    "process_left_member lỗi"
+                )
+
+            return True
+
+        # ----------------------------------------------------
+        # COMMAND
+        # ----------------------------------------------------
+        text_value = message.get("text") or ""
+
+        if text_value.startswith("/"):
+            try:
+                return dispatch_command_clean(message)
+            except Exception as e:
+                report_internal_error(message, e)
+                return False
+
+        # ----------------------------------------------------
+        # NỐI CHỮ
+        # ----------------------------------------------------
+        try:
+            if handle_noichu_message(message):
+                return True
+        except Exception:
+            logging.exception(
+                "Nối chữ lỗi"
+            )
+
+        # ----------------------------------------------------
+        # AFK
+        # ----------------------------------------------------
+        try:
+            handle_afk_message(message)
+        except Exception:
+            logging.exception(
+                "AFK handler lỗi"
+            )
+
+        # ----------------------------------------------------
+        # FILTER
+        # ----------------------------------------------------
+        try:
+            if handle_filter_message(message):
+                return True
+        except Exception:
+            logging.exception(
+                "Filter handler lỗi"
+            )
+
+        # ----------------------------------------------------
+        # PROTECTION
+        # ----------------------------------------------------
+        try:
+            if handle_protection(message):
+                return True
+        except Exception:
+            logging.exception(
+                "Protection handler lỗi"
+            )
+
+        # ----------------------------------------------------
+        # LEVEL
+        # ----------------------------------------------------
+        try:
+            process_level_for_message(message)
+        except Exception:
+            logging.exception(
+                "Level handler lỗi"
+            )
+
+        return True
+
+    except Exception as e:
+        report_internal_error(message, e)
+        return False
+
+
+# ------------------------------------------------------------
+# DÙNG PROCESSOR CUỐI CÙNG
+# ------------------------------------------------------------
+
+process_message_update = process_message_update_final
+
+
+# ------------------------------------------------------------
+# UPDATE PROCESSOR CUỐI CÙNG
+# ------------------------------------------------------------
+
+def process_update_final_v2(update):
+    """
+    Processor cuối cùng của bot.
+    """
+
+    if not isinstance(update, dict):
+        return False
+
+    try:
+        update_id = update.get("update_id")
+
+        # Chống update trùng
+        if update_id is not None:
+
+            if is_update_processed(update_id):
+                return False
+
+            mark_update_processed(update_id)
+
+        # ----------------------------------------------------
+        # CALLBACK
+        # ----------------------------------------------------
+        callback_query = update.get("callback_query")
+
+        if callback_query:
+            return process_callback_query_final(
+                callback_query
+            )
+
+        # ----------------------------------------------------
+        # MESSAGE
+        # ----------------------------------------------------
+        message = update.get("message")
+
+        if message:
+
+            try:
+                preprocess_message(message)
+            except Exception:
+                logging.exception(
+                    "preprocess_message lỗi"
+                )
+
+            return process_message_update_final(
+                message
+            )
+
+        # ----------------------------------------------------
+        # EDITED MESSAGE
+        # ----------------------------------------------------
+        edited_message = update.get("edited_message")
+
+        if edited_message:
+
+            try:
+                preprocess_message(
+                    edited_message
+                )
+            except Exception:
+                logging.exception(
+                    "preprocess edited_message lỗi"
+                )
+
+            return process_message_update_final(
+                edited_message
+            )
+
+        # ----------------------------------------------------
+        # CHANNEL POST
+        # ----------------------------------------------------
+        channel_post = update.get("channel_post")
+
+        if channel_post:
+            return False
+
+        return False
+
+    except Exception:
+        logging.exception(
+            "process_update_final_v2 lỗi"
+        )
+        return False
+
+
+process_update = process_update_final_v2
+
+
+# ------------------------------------------------------------
+# BOT HEALTH CHECK
+# ------------------------------------------------------------
+
+def bot_health_check():
+    """
+    Kiểm tra Telegram API.
+    """
+
+    try:
+        me = get_bot_information()
+
+        if not me:
+            logging.error(
+                "Health check thất bại."
+            )
+            return False
+
+        username = me.get("username") or "unknown"
+        first_name = me.get("first_name") or "Ngọc Mỹ"
+
+        logging.info(
+            "Bot online: %s (@%s)",
+            first_name,
+            username
+        )
+
+        return True
+
+    except Exception:
+        logging.exception(
+            "bot_health_check lỗi"
+        )
+        return False
+
+
+# ------------------------------------------------------------
+# TOKEN CHECK
+# ------------------------------------------------------------
+
+def validate_bot_token():
+
+    if not BOT_TOKEN:
+        print("")
+        print("============================================")
+        print("❌ THIẾU BOT_TOKEN")
+        print("")
+        print("Hãy đặt biến môi trường:")
+        print("BOT_TOKEN=8976236384:AAEpZ_w0uCKliDe4ip8IA-FWX0_8j1UhX5k")
+        print("")
+        print("Railway:")
+        print("Variables → BOT_TOKEN")
+        print("============================================")
+        print("")
+
+        return False
+
+    if len(BOT_TOKEN) < 20:
+        print(
+            "⚠️ BOT_TOKEN có vẻ không hợp lệ."
+        )
+        return False
+
+    return True
+
+
+# ------------------------------------------------------------
+# STARTUP VALIDATION
+# ------------------------------------------------------------
+
+def startup_validation():
+
+    print("")
+    print("============================================")
+    print("       NGỌC MỸ - STARTUP CHECK")
+    print("============================================")
+
+    # Token
+    if not validate_bot_token():
+        return False
+
+    # Database
+    try:
+        initialize_database_safe()
+        print("✅ Database: OK")
+    except Exception:
+        print("❌ Database: ERROR")
+        logging.exception(
+            "Database startup error"
+        )
+        return False
+
+    # Command map
+    try:
+        if final_command_check():
+            print("✅ Commands: OK")
+        else:
+            print(
+                "⚠️ Commands: có command chưa đăng ký"
+            )
+    except Exception:
+        print("⚠️ Không kiểm tra được commands")
+
+    # Telegram
+    try:
+        if bot_health_check():
+            print("✅ Telegram API: OK")
+        else:
+            print("❌ Telegram API: ERROR")
+            return False
+    except Exception:
+        print("❌ Telegram API: ERROR")
+        return False
+
+    print("============================================")
+    print("       NGỌC MỸ ĐÃ SẴN SÀNG")
+    print("       AI: OFF / REMOVED")
+    print("============================================")
+    print("")
+
+    return True
+
+
+# ------------------------------------------------------------
+# SIGNAL / SHUTDOWN
+# ------------------------------------------------------------
+
+BOT_STOP_REQUESTED = False
+
+
+def request_bot_stop():
+    global BOT_STOP_REQUESTED
+
+    BOT_STOP_REQUESTED = True
+
+    logging.info(
+        "Bot nhận yêu cầu dừng."
     )
 
+
+# ------------------------------------------------------------
+# EXCEPTION HANDLER
+# ------------------------------------------------------------
+
+def install_exception_handler():
+
+    def handle_exception(exc_type, exc_value, exc_traceback):
+
+        if issubclass(
+            exc_type,
+            KeyboardInterrupt
+        ):
+            sys.__excepthook__(
+                exc_type,
+                exc_value,
+                exc_traceback
+            )
+            return
+
+        logging.error(
+            "Unhandled exception",
+            exc_info=(
+                exc_type,
+                exc_value,
+                exc_traceback
+            )
+        )
+
+    sys.excepthook = handle_exception
+
+
+try:
+    install_exception_handler()
+except Exception:
+    pass
 
 # ============================================================
-# MAIN
+# PHẦN 15/15
+# MAIN + START BOT
 # ============================================================
 
-async def main():
+def final_startup():
 
-    validate_token()
+    print("")
+    print("╔════════════════════════════════════════════╗")
+    print("║             NGỌC MỸ TELEGRAM BOT          ║")
+    print("╠════════════════════════════════════════════╣")
+    print("║ AI                  : ĐÃ XÓA               ║")
+    print("║ MODERATION          : ON                   ║")
+    print("║ PROTECTION          : ON                   ║")
+    print("║ AFK / FILTER        : ON                   ║")
+    print("║ ĐIỂM DANH           : ON                   ║")
+    print("║ LEVEL                : ON                   ║")
+    print("║ NỐI CHỮ              : ON                   ║")
+    print("║ THƠ ĐỜI / THƠ TÌNH : ON                   ║")
+    print("╚════════════════════════════════════════════╝")
+    print("")
 
-    logger.info(
-        "=========================================="
-    )
+    try:
+        initialize_database_safe()
+    except Exception:
+        logging.exception(
+            "Không thể initialize database."
+        )
+        return False
 
-    logger.info(
-        "THEONE BOT v%s",
-        VERSION
-    )
+    try:
+        final_command_check()
+    except Exception:
+        logging.exception(
+            "Không thể kiểm tra command."
+        )
 
-    logger.info(
-        "Pure Python Telegram Bot API"
-    )
+    return True
 
-    logger.info(
-        "Python: %s",
-        sys.version.split()[0]
-    )
 
-    logger.info(
-        "=========================================="
-    )
+def main():
 
-    # Database.
-    init_db()
+    global BOT_STOP_REQUESTED
 
-    # Xóa webhook để polling hoạt động.
-    await delete_webhook()
+    BOT_STOP_REQUESTED = False
 
-    # Kiểm tra token.
-    await get_bot_info()
+    print("")
+    print("============================================")
+    print("          KHỞI ĐỘNG NGỌC MỸ")
+    print("============================================")
 
-    # Cập nhật menu lệnh Telegram.
-    await set_bot_commands()
+    # --------------------------------------------------------
+    # KIỂM TRA TOKEN
+    # --------------------------------------------------------
 
-    # Chạy bot.
-    await polling_loop()
+    if not validate_bot_token():
+        print("")
+        print("❌ BOT KHÔNG THỂ CHẠY.")
+        print("❌ Hãy thêm BOT_TOKEN vào biến môi trường.")
+        print("")
+        return
 
-    await shutdown()
+    # --------------------------------------------------------
+    # DATABASE
+    # --------------------------------------------------------
+
+    try:
+        if not final_startup():
+            print(
+                "❌ Startup database thất bại."
+            )
+            return
+
+        print(
+            "✅ Database đã sẵn sàng."
+        )
+
+    except Exception:
+        logging.exception(
+            "Startup database lỗi."
+        )
+        return
+
+    # --------------------------------------------------------
+    # TELEGRAM API
+    # --------------------------------------------------------
+
+    try:
+        delete_webhook()
+
+        print(
+            "✅ Webhook đã được xử lý."
+        )
+
+    except Exception:
+        logging.exception(
+            "Không thể xóa webhook."
+        )
+
+    # --------------------------------------------------------
+    # BOT INFORMATION
+    # --------------------------------------------------------
+
+    try:
+        bot_info = get_bot_information()
+
+        if bot_info:
+
+            bot_username = (
+                bot_info.get("username")
+                or "unknown"
+            )
+
+            bot_name = (
+                bot_info.get("first_name")
+                or "Ngọc Mỹ"
+            )
+
+            print("")
+            print(
+                "🤖 Bot:",
+                bot_name
+            )
+
+            print(
+                "👤 Username:",
+                "@" + bot_username
+            )
+
+        else:
+            print(
+                "⚠️ Không lấy được thông tin bot."
+            )
+
+    except Exception:
+        logging.exception(
+            "get_bot_information lỗi."
+        )
+
+    # --------------------------------------------------------
+    # COMMAND CHECK
+    # --------------------------------------------------------
+
+    try:
+        if final_command_check():
+            print(
+                "✅ Command map hoàn chỉnh."
+            )
+        else:
+            print(
+                "⚠️ Command map có cảnh báo."
+            )
+
+    except Exception:
+        logging.exception(
+            "Command check lỗi."
+        )
+
+    # --------------------------------------------------------
+    # HEALTH CHECK
+    # --------------------------------------------------------
+
+    try:
+        if bot_health_check():
+            print(
+                "✅ Telegram API hoạt động."
+            )
+        else:
+            print(
+                "⚠️ Telegram API chưa phản hồi."
+            )
+
+    except Exception:
+        logging.exception(
+            "Health check lỗi."
+        )
+
+    # --------------------------------------------------------
+    # START POLLING
+    # --------------------------------------------------------
+
+    print("")
+    print("============================================")
+    print("        NGỌC MỸ ĐANG CHẠY")
+    print("        AI: ĐÃ XÓA HOÀN TOÀN")
+    print("        Đang chờ tin nhắn...")
+    print("============================================")
+    print("")
+
+    try:
+
+        polling_loop()
+
+    except KeyboardInterrupt:
+
+        print("")
+        print(
+            "🛑 Ngọc Mỹ đã được dừng."
+        )
+
+    except Exception:
+
+        logging.exception(
+            "Polling loop bị lỗi."
+        )
+
+        print("")
+        print(
+            "❌ Polling loop đã dừng do lỗi."
+        )
 
 
 # ============================================================
@@ -10795,36 +8655,4 @@ async def main():
 # ============================================================
 
 if __name__ == "__main__":
-
-    try:
-
-        asyncio.run(
-            main()
-        )
-
-    except KeyboardInterrupt:
-
-        print(
-            "\nTHEONE BOT đã dừng."
-        )
-
-    except Exception as e:
-
-        logger.exception(
-            "Fatal error: %s",
-            e
-        )
-
-        print(
-            "\nBOT DỪNG DO LỖI:"
-        )
-
-        print(
-            str(e)
-        )
-
-
-# ============================================================
-# END PHẦN 10/10
-# ============================================================
-
+    main()
