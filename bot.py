@@ -9995,6 +9995,1165 @@ async def main():
 # ENTRY POINT
 # ============================================================
 
+# ============================================================
+# KHỐI 1 - HỆ THỐNG XU / TÀI XỈU
+# ============================================================
+
+def init_xu_database():
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    # Tài khoản xu
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS xu_accounts (
+            user_id INTEGER PRIMARY KEY,
+            xu REAL NOT NULL DEFAULT 0,
+            xu_da_mat REAL NOT NULL DEFAULT 0,
+            khoinghieptanthu INTEGER NOT NULL DEFAULT 0,
+            admin_mode INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+
+    # Nhiệm vụ
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS xu_tasks (
+            user_id INTEGER PRIMARY KEY,
+            messages_count INTEGER NOT NULL DEFAULT 0,
+            people_added INTEGER NOT NULL DEFAULT 0,
+            bot_shared INTEGER NOT NULL DEFAULT 0,
+            easy_message_done INTEGER NOT NULL DEFAULT 0,
+            easy_add_done INTEGER NOT NULL DEFAULT 0,
+            easy_share_done INTEGER NOT NULL DEFAULT 0,
+            hard_message_done INTEGER NOT NULL DEFAULT 0,
+            hard_add_done INTEGER NOT NULL DEFAULT 0,
+            hard_share_done INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def get_xu_account(user_id):
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT user_id, xu, xu_da_mat, khoinghieptanthu, admin_mode "
+        "FROM xu_accounts WHERE user_id = ?",
+        (int(user_id),)
+    )
+
+    row = cur.fetchone()
+
+    if not row:
+        cur.execute(
+            """
+            INSERT INTO xu_accounts
+            (user_id, xu, xu_da_mat, khoinghieptanthu, admin_mode)
+            VALUES (?, 0, 0, 0, 0)
+            """,
+            (int(user_id),)
+        )
+        conn.commit()
+
+        row = (
+            int(user_id),
+            0,
+            0,
+            0,
+            0
+        )
+
+    conn.close()
+    return row
+
+
+def get_xu(user_id):
+    account = get_xu_account(user_id)
+
+    # admin mode = xu vô hạn
+    if account[4] == 1:
+        return float("inf")
+
+    return float(account[1])
+
+
+def add_xu(user_id, amount):
+    if amount <= 0:
+        return
+
+    account = get_xu_account(user_id)
+
+    # Admin không cần cộng xu
+    if account[4] == 1:
+        return
+
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE xu_accounts
+        SET xu = xu + ?
+        WHERE user_id = ?
+        """,
+        (float(amount), int(user_id))
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def remove_xu(user_id, amount):
+    if amount <= 0:
+        return False
+
+    account = get_xu_account(user_id)
+
+    # Admin vô hạn xu
+    if account[4] == 1:
+        return True
+
+    current_xu = float(account[1])
+
+    if current_xu < float(amount):
+        return False
+
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE xu_accounts
+        SET xu = xu - ?,
+            xu_da_mat = xu_da_mat + ?
+        WHERE user_id = ?
+        """,
+        (
+            float(amount),
+            float(amount),
+            int(user_id)
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return True
+
+
+def add_xu_task_user(user_id):
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT user_id FROM xu_tasks WHERE user_id = ?",
+        (int(user_id),)
+    )
+
+    if not cur.fetchone():
+        cur.execute(
+            """
+            INSERT INTO xu_tasks
+            (user_id)
+            VALUES (?)
+            """,
+            (int(user_id),)
+        )
+
+    conn.commit()
+    conn.close()
+
+
+# Khởi tạo database Xu ngay khi nạp module
+try:
+    init_xu_database()
+except Exception as e:
+    print("Lỗi khởi tạo database Xu:", e)
+
+# ============================================================
+# KHỐI 2 - /xume
+# ============================================================
+
+async def command_xume(message, args=None):
+    user = from_user(message)
+
+    if not user:
+        return
+
+    user_id = int(user.get("id", 0))
+    username = user.get("username") or ""
+    first_name = user.get("first_name") or "Không tên"
+
+    account = get_xu_account(user_id)
+
+    xu = account[1]
+    xu_da_mat = account[2]
+    khoi_nghiep = account[3]
+    admin_mode = account[4]
+
+    # ========================================================
+    # TRONG NHÓM
+    # Chỉ hiện số Xu, không hiện thông tin cá nhân
+    # ========================================================
+    if is_group(message):
+
+        if admin_mode == 1:
+            xu_text = "∞"
+        else:
+            xu_text = f"{float(xu):.2f}"
+
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "🛠️ Phần mềm Admin",
+                        "callback_data": "xu_admin"
+                    }
+                ]
+            ]
+        }
+
+        await send_message(
+            chat_id(message),
+            f"💰 Xu hiện tại: {xu_text}",
+            reply_markup=keyboard
+        )
+
+        # Gửi thông tin cá nhân riêng tư
+        private_text = (
+            "💰 THÔNG TIN XU CÁ NHÂN\n\n"
+            f"👤 Tên: {html.escape(first_name)}\n"
+            f"🆔 ID: <code>{user_id}</code>\n"
+            f"👤 Username: @{html.escape(username) if username else 'Không có'}\n\n"
+            f"💰 Xu hiện tại: "
+            f"{'∞' if admin_mode == 1 else f'{float(xu):.2f}'}\n"
+            f"📉 Xu đã mất: {float(xu_da_mat):.2f}\n"
+            f"🔰 Code tân thủ: "
+            f"{'Đã sử dụng' if khoi_nghiep else 'Chưa sử dụng'}\n\n"
+            "🔐 Code tân thủ:\n"
+            "<code>khoinghieptanthu</code>\n\n"
+            "Dùng /nhapcode khoinghieptanthu để nhận 100 Xu."
+        )
+
+        try:
+            await send_message(
+                user_id,
+                private_text
+            )
+        except Exception:
+            pass
+
+        return
+
+    # ========================================================
+    # TRONG CHAT RIÊNG
+    # Hiện đầy đủ thông tin cá nhân
+    # ========================================================
+
+    if admin_mode == 1:
+        xu_text = "∞"
+    else:
+        xu_text = f"{float(xu):.2f}"
+
+    text = (
+        "💰 THÔNG TIN XU CỦA BẠN\n\n"
+        f"👤 Tên: {html.escape(first_name)}\n"
+        f"🆔 ID: <code>{user_id}</code>\n"
+        f"👤 Username: @{html.escape(username) if username else 'Không có'}\n\n"
+        f"💰 Xu hiện tại: {xu_text}\n"
+        f"📉 Xu đã mất: {float(xu_da_mat):.2f}\n"
+        f"🔰 Code tân thủ: "
+        f"{'Đã sử dụng' if khoi_nghiep else 'Chưa sử dụng'}\n\n"
+        "🔐 CODE TÂN THỦ\n"
+        "<code>khoinghieptanthu</code>\n\n"
+        "🎁 Dùng:\n"
+        "<code>/nhapcode khoinghieptanthu</code>\n"
+        "để nhận 100 Xu."
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "🛠️ Phần mềm Admin",
+                    "callback_data": "xu_admin"
+                }
+            ]
+        ]
+    }
+
+    await send_message(
+        chat_id(message),
+        text,
+        reply_markup=keyboard
+    )
+
+
+# Đăng ký lệnh
+COMMAND_HANDLERS["xume"] = command_xume
+
+# ============================================================
+# KHỐI 3 - CODE TÂN THỦ
+# /nhapcode khoinghieptanthu
+# ============================================================
+
+async def command_nhapcode(message, args=None):
+    user = from_user(message)
+
+    if not user:
+        return
+
+    user_id = int(user.get("id", 0))
+
+    # Kiểm tra đã nhập code chưa
+    account = get_xu_account(user_id)
+
+    if account[3] == 1:
+        await send_message(
+            chat_id(message),
+            "❌ Bạn đã sử dụng code tân thủ trước đó rồi."
+        )
+        return
+
+    # Lấy code
+    code = ""
+
+    if args:
+        if isinstance(args, list):
+            code = " ".join(str(x) for x in args).strip()
+        else:
+            code = str(args).strip()
+
+    code = code.lower()
+
+    # Sai code
+    if code != "khoinghieptanthu":
+        await send_message(
+            chat_id(message),
+            "❌ Code không hợp lệ."
+        )
+        return
+
+    # Cộng 100 Xu và đánh dấu đã dùng
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE xu_accounts
+        SET xu = xu + 100,
+            khoinghieptanthu = 1
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    await send_message(
+        chat_id(message),
+        "🎉 KÍCH HOẠT CODE THÀNH CÔNG!\n\n"
+        "🔰 Code tân thủ: khoinghieptanthu\n"
+        "💰 Bạn nhận được: +100 Xu\n\n"
+        "💰 Dùng /xume để xem số Xu hiện tại."
+    )
+
+
+COMMAND_HANDLERS["nhapcode"] = command_nhapcode
+
+# ============================================================
+# KHỐI 4 - /xudamat
+# Xem tổng số Xu đã mất
+# Dùng được cả nhóm và chat riêng
+# ============================================================
+
+async def command_xudamat(message, args=None):
+    user = from_user(message)
+
+    if not user:
+        return
+
+    user_id = int(user.get("id", 0))
+    account = get_xu_account(user_id)
+
+    xu_da_mat = float(account[2])
+    admin_mode = account[4]
+
+    if admin_mode == 1:
+        xu_text = "∞"
+    else:
+        xu_text = f"{xu_da_mat:.2f}"
+
+    await send_message(
+        chat_id(message),
+        "📉 THỐNG KÊ XU ĐÃ MẤT\n\n"
+        f"💸 Tổng Xu đã mất: {xu_text}\n\n"
+        "💡 Xu bị trừ khi bạn thua Tài Xỉu "
+        "hoặc sử dụng những chức năng yêu cầu Xu."
+    )
+
+
+COMMAND_HANDLERS["xudamat"] = command_xudamat
+
+# ============================================================
+# KHỐI 5 - /nhiemvu
+# HỆ THỐNG NHIỆM VỤ XU
+# Dùng được trong nhóm + chat riêng
+# ============================================================
+
+async def command_nhiemvu(message, args=None):
+    user = from_user(message)
+
+    if not user:
+        return
+
+    user_id = int(user.get("id", 0))
+
+    add_xu_task_user(user_id)
+
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT
+            messages_count,
+            people_added,
+            bot_shared,
+            easy_message_done,
+            easy_add_done,
+            easy_share_done,
+            hard_message_done,
+            hard_add_done,
+            hard_share_done
+        FROM xu_tasks
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        row = (0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+    (
+        messages_count,
+        people_added,
+        bot_shared,
+        easy_message_done,
+        easy_add_done,
+        easy_share_done,
+        hard_message_done,
+        hard_add_done,
+        hard_share_done
+    ) = row
+
+    # Trạng thái nhiệm vụ
+    def status(done):
+        return "✅ Hoàn thành" if done else "⬜ Chưa hoàn thành"
+
+    text = (
+        "🎯 NHIỆM VỤ XU\n\n"
+
+        "🟢 NHIỆM VỤ DỄ — +20 Xu\n"
+        f"💬 Gửi 50 tin nhắn: {status(easy_message_done)}\n"
+        f"👥 Thêm 1 thành viên: {status(easy_add_done)}\n"
+        f"🔗 Chia sẻ bot 1 lần: {status(easy_share_done)}\n\n"
+
+        "🔴 NHIỆM VỤ KHÓ — +100 Xu\n"
+        f"💬 Gửi 50 tin nhắn: "
+        f"{messages_count}/50 — {status(hard_message_done)}\n"
+        f"👥 Thêm 5 thành viên: "
+        f"{people_added}/5 — {status(hard_add_done)}\n"
+        f"🔗 Chia sẻ bot 5 lần: "
+        f"{bot_shared}/5 — {status(hard_share_done)}\n\n"
+
+        "💡 Nhiệm vụ chỉ nhận thưởng một lần.\n"
+        "💰 Dùng /xume để xem số Xu."
+    )
+
+    await send_message(
+        chat_id(message),
+        text
+    )
+
+
+COMMAND_HANDLERS["nhiemvu"] = command_nhiemvu
+
+# ============================================================
+# KHỐI 6 - TỰ ĐỘNG ĐẾM TIN NHẮN
+# 50 tin nhắn = +100 Xu
+# ============================================================
+
+async def xu_count_message_task(message):
+    # Chỉ tính tin nhắn trong nhóm
+    if not is_group(message):
+        return
+
+    user = from_user(message)
+
+    if not user:
+        return
+
+    user_id = int(user.get("id", 0))
+
+    # Bỏ qua bot
+    if user.get("is_bot"):
+        return
+
+    add_xu_task_user(user_id)
+
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    # Tăng số tin nhắn
+    cur.execute(
+        """
+        UPDATE xu_tasks
+        SET messages_count = messages_count + 1
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    # Lấy thông tin mới
+    cur.execute(
+        """
+        SELECT messages_count, hard_message_done
+        FROM xu_tasks
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    row = cur.fetchone()
+
+    conn.commit()
+    conn.close()
+
+    if not row:
+        return
+
+    messages_count = int(row[0])
+    hard_message_done = int(row[1])
+
+    # Đủ 50 tin nhắn
+    if messages_count >= 50 and hard_message_done == 0:
+
+        add_xu(user_id, 100)
+
+        conn = sqlite3.connect(DATABASE)
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE xu_tasks
+            SET hard_message_done = 1
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        )
+
+        conn.commit()
+        conn.close()
+
+        await send_message(
+            chat_id(message),
+            "🎉 NHIỆM VỤ HOÀN THÀNH!\n\n"
+            "💬 Bạn đã gửi đủ 50 tin nhắn.\n"
+            "💰 Phần thưởng: +100 Xu\n\n"
+            "💰 Dùng /xume để xem Xu."
+        )
+
+# ============================================================
+# KHỐI 7 - NHIỆM VỤ THÊM THÀNH VIÊN
+# 1 người = +20 Xu
+# 5 người = +100 Xu
+# ============================================================
+
+async def xu_count_new_member_task(message):
+    if not is_group(message):
+        return
+
+    user = from_user(message)
+
+    if not user:
+        return
+
+    user_id = int(user.get("id", 0))
+
+    # Chỉ xử lý khi Telegram gửi cập nhật thành viên mới
+    new_members = message.get("new_chat_members")
+
+    if not new_members:
+        return
+
+    # Không tính bot
+    real_members = [
+        member for member in new_members
+        if not member.get("is_bot", False)
+    ]
+
+    if not real_members:
+        return
+
+    add_xu_task_user(user_id)
+
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    # Mỗi thành viên mới tính +1
+    cur.execute(
+        """
+        UPDATE xu_tasks
+        SET people_added = people_added + ?
+        WHERE user_id = ?
+        """,
+        (len(real_members), user_id)
+    )
+
+    cur.execute(
+        """
+        SELECT
+            people_added,
+            easy_add_done,
+            hard_add_done
+        FROM xu_tasks
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    row = cur.fetchone()
+
+    conn.commit()
+    conn.close()
+
+    if not row:
+        return
+
+    people_added = int(row[0])
+    easy_add_done = int(row[1])
+    hard_add_done = int(row[2])
+
+    # ========================================================
+    # MỐC 1 NGƯỜI
+    # ========================================================
+
+    if people_added >= 1 and easy_add_done == 0:
+
+        add_xu(user_id, 20)
+
+        conn = sqlite3.connect(DATABASE)
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE xu_tasks
+            SET easy_add_done = 1
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        )
+
+        conn.commit()
+        conn.close()
+
+        await send_message(
+            chat_id(message),
+            "🎉 NHIỆM VỤ DỄ HOÀN THÀNH!\n\n"
+            "👤 Bạn đã thêm 1 thành viên vào nhóm.\n"
+            "💰 Phần thưởng: +20 Xu"
+        )
+
+    # ========================================================
+    # MỐC 5 NGƯỜI
+    # ========================================================
+
+    if people_added >= 5 and hard_add_done == 0:
+
+        add_xu(user_id, 100)
+
+        conn = sqlite3.connect(DATABASE)
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE xu_tasks
+            SET hard_add_done = 1
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        )
+
+        conn.commit()
+        conn.close()
+
+        await send_message(
+            chat_id(message),
+            "🎉 NHIỆM VỤ KHÓ HOÀN THÀNH!\n\n"
+            "👥 Bạn đã thêm đủ 5 thành viên.\n"
+            "💰 Phần thưởng: +100 Xu"
+        )
+
+# ============================================================
+# KHỐI 8 - NHIỆM VỤ CHIA SẺ BOT
+# 1 lần = +20 Xu
+# 5 lần = +100 Xu
+# ============================================================
+
+async def command_chiasebot(message, args=None):
+    user = from_user(message)
+
+    if not user:
+        return
+
+    user_id = int(user.get("id", 0))
+
+    add_xu_task_user(user_id)
+
+    bot_info = await api_request("getMe")
+
+    if not bot_info or not bot_info.get("ok"):
+        await send_message(
+            chat_id(message),
+            "❌ Không lấy được thông tin bot."
+        )
+        return
+
+    bot_username = bot_info["result"].get("username")
+
+    if not bot_username:
+        await send_message(
+            chat_id(message),
+            "❌ Bot chưa có username."
+        )
+        return
+
+    share_url = f"https://t.me/{bot_username}"
+
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "🔗 Chia sẻ bot",
+                    "url": "https://t.me/share/url?url="
+                          + urllib.parse.quote(share_url)
+                          + "&text="
+                          + urllib.parse.quote(
+                              "Mời bạn sử dụng bot Ngọc Mỹ 🤖"
+                          )
+                }
+            ],
+            [
+                {
+                    "text": "✅ Đã chia sẻ",
+                    "callback_data": "xu_share_done"
+                }
+            ]
+        ]
+    }
+
+    await send_message(
+        chat_id(message),
+        "🔗 NHIỆM VỤ CHIA SẺ BOT\n\n"
+        "Hãy chia sẻ bot cho bạn bè.\n\n"
+        "🟢 1 lần chia sẻ → +20 Xu\n"
+        "🔴 5 lần chia sẻ → +100 Xu\n\n"
+        "Sau khi chia sẻ, bấm nút "
+        "「✅ Đã chia sẻ」 để ghi nhận.",
+        reply_markup=keyboard
+    )
+
+
+async def xu_share_done_callback(callback_query):
+    user = callback_query.get("from") or {}
+
+    user_id = int(user.get("id", 0))
+
+    add_xu_task_user(user_id)
+
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT
+            bot_shared,
+            easy_share_done,
+            hard_share_done
+        FROM xu_tasks
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        return
+
+    bot_shared = int(row[0])
+    easy_share_done = int(row[1])
+    hard_share_done = int(row[2])
+
+    # Tăng lượt chia sẻ
+    bot_shared += 1
+
+    cur.execute(
+        """
+        UPDATE xu_tasks
+        SET bot_shared = ?
+        WHERE user_id = ?
+        """,
+        (bot_shared, user_id)
+    )
+
+    conn.commit()
+    conn.close()
+
+    # ========================================================
+    # MỐC 1 LẦN
+    # ========================================================
+
+    if bot_shared >= 1 and easy_share_done == 0:
+
+        add_xu(user_id, 20)
+
+        conn = sqlite3.connect(DATABASE)
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE xu_tasks
+            SET easy_share_done = 1
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        )
+
+        conn.commit()
+        conn.close()
+
+        await answer_callback(
+            callback_query,
+            "🎉 +20 Xu"
+        )
+
+        return
+
+    # ========================================================
+    # MỐC 5 LẦN
+    # ========================================================
+
+    if bot_shared >= 5 and hard_share_done == 0:
+
+        add_xu(user_id, 100)
+
+        conn = sqlite3.connect(DATABASE)
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE xu_tasks
+            SET hard_share_done = 1
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        )
+
+        conn.commit()
+        conn.close()
+
+        await answer_callback(
+            callback_query,
+            "🎉 +100 Xu"
+        )
+
+        return
+
+    await answer_callback(
+        callback_query,
+        f"Đã ghi nhận lượt chia sẻ: {bot_shared}"
+    )
+
+
+COMMAND_HANDLERS["chiasebot"] = command_chiasebot
+
+# ============================================================
+# KHỐI 9 - TÀI XỈU
+# /taixiu tai 10
+# /taixiu xiu 10
+# ============================================================
+
+async def command_taixiu(message, args=None):
+    user = from_user(message)
+
+    if not user:
+        return
+
+    user_id = int(user.get("id", 0))
+
+    if not args or len(args) < 2:
+        await send_message(
+            chat_id(message),
+            "🎲 TÀI XỈU\n\n"
+            "Cách dùng:\n"
+            "/taixiu tai 10\n"
+            "/taixiu xiu 10\n\n"
+            "💰 Cược tối thiểu: 10 Xu\n"
+            "💰 Cược tối đa: số Xu bạn đang có\n"
+            "🎯 Thắng: nhận 2× tiền cược\n"
+            "💸 Thua: mất tiền cược"
+        )
+        return
+
+    choice = str(args[0]).lower().strip()
+
+    try:
+        bet = float(args[1])
+    except Exception:
+        await send_message(
+            chat_id(message),
+            "❌ Số Xu cược không hợp lệ."
+        )
+        return
+
+    if choice not in ("tai", "xiu"):
+        await send_message(
+            chat_id(message),
+            "❌ Bạn phải chọn Tài hoặc Xỉu.\n\n"
+            "Ví dụ:\n"
+            "/taixiu tai 10\n"
+            "/taixiu xiu 10"
+        )
+        return
+
+    if bet < 10:
+        await send_message(
+            chat_id(message),
+            "❌ Mức cược tối thiểu là 10 Xu."
+        )
+        return
+
+    account = get_xu_account(user_id)
+    admin_mode = account[4]
+
+    if admin_mode == 1:
+        balance = float("inf")
+    else:
+        balance = float(account[1])
+
+    if admin_mode != 1 and bet > balance:
+        await send_message(
+            chat_id(message),
+            f"❌ Bạn không đủ Xu.\n"
+            f"💰 Xu hiện tại: {balance:.2f}\n"
+            f"🎲 Tiền cược: {bet:.2f}"
+        )
+        return
+
+    # ========================================================
+    # TUNG 3 XÚC XẮC
+    # ========================================================
+
+    dice_1 = random.randint(1, 6)
+    dice_2 = random.randint(1, 6)
+    dice_3 = random.randint(1, 6)
+
+    total = dice_1 + dice_2 + dice_3
+
+    # 4-10 = Xỉu
+    # 11-17 = Tài
+    # Bộ ba đồng nhất = Nhà cái thắng
+    triple = (
+        dice_1 == dice_2 == dice_3
+    )
+
+    if triple:
+        result = "bo_ba"
+    elif total >= 11:
+        result = "tai"
+    else:
+        result = "xiu"
+
+    # ========================================================
+    # TRỪ TIỀN CƯỢC TRƯỚC
+    # ========================================================
+
+    if admin_mode != 1:
+        if not remove_xu(user_id, bet):
+            await send_message(
+                chat_id(message),
+                "❌ Không thể trừ tiền cược. Vui lòng thử lại."
+            )
+            return
+
+    # ========================================================
+    # KẾT QUẢ
+    # ========================================================
+
+    if result == choice:
+        # Người chơi nhận 2 lần tiền cược
+        if admin_mode != 1:
+            add_xu(user_id, bet * 2)
+
+        win_text = (
+            f"🎉 BẠN THẮNG!\n"
+            f"💰 Nhận: +{bet * 2:.2f} Xu"
+        )
+
+    else:
+        win_text = (
+            f"💀 BẠN THUA!\n"
+            f"💸 Mất: {bet:.2f} Xu"
+        )
+
+    result_name = {
+        "tai": "🎯 TÀI",
+        "xiu": "🔵 XỈU",
+        "bo_ba": "💥 BỘ BA - NHÀ CÁI THẮNG"
+    }[result]
+
+    if admin_mode == 1:
+        balance_text = "∞"
+    else:
+        balance_text = f"{get_xu(user_id):.2f}"
+
+    await send_message(
+        chat_id(message),
+        "🎲 KẾT QUẢ TÀI XỈU\n\n"
+        f"🎲 Xúc xắc: "
+        f"[{dice_1}] [{dice_2}] [{dice_3}]\n"
+        f"🔢 Tổng: {total}\n"
+        f"📊 Kết quả: {result_name}\n\n"
+        f"🎯 Bạn chọn: "
+        f"{'TÀI' if choice == 'tai' else 'XỈU'}\n"
+        f"💰 Tiền cược: {bet:.2f} Xu\n\n"
+        f"{win_text}\n\n"
+        f"💰 Số dư: {balance_text}"
+    )
+
+
+COMMAND_HANDLERS["taixiu"] = command_taixiu
+
+# ============================================================
+# KHỐI 10 - PHẦN MỀM ADMIN XU
+# ============================================================
+
+XU_ADMIN_CODE = "ngocmyvip207"
+
+
+async def command_xu_admin_code(message, args=None):
+    user = from_user(message)
+
+    if not user:
+        return
+
+    user_id = int(user.get("id", 0))
+
+    # Chỉ cho nhập mã trong chat riêng
+    if not is_private(message):
+        await send_message(
+            chat_id(message),
+            "🔐 Vui lòng mở chat riêng với bot để nhập mã Admin."
+        )
+        return
+
+    code = ""
+
+    if args:
+        if isinstance(args, list):
+            code = " ".join(str(x) for x in args).strip()
+        else:
+            code = str(args).strip()
+
+    if code != XU_ADMIN_CODE:
+        await send_message(
+            chat_id(message),
+            "❌ Code đã sai"
+        )
+        return
+
+    get_xu_account(user_id)
+
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE xu_accounts
+        SET admin_mode = 1
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    await send_message(
+        chat_id(message),
+        "👑 KÍCH HOẠT ADMIN THÀNH CÔNG!\n\n"
+        "🛠️ Chế độ Admin: BẬT\n"
+        "💰 Xu hiện tại: ∞\n"
+        "🎲 Có thể sử dụng Tài Xỉu mà không giới hạn Xu."
+    )
+
+
+async def xu_admin_callback(callback_query):
+    user = callback_query.get("from") or {}
+
+    user_id = int(user.get("id", 0))
+
+    # Chỉ cho xử lý ở chat riêng
+    callback_message = callback_query.get("message") or {}
+    callback_chat = callback_message.get("chat") or {}
+
+    if callback_chat.get("type") != "private":
+        await answer_callback(
+            callback_query,
+            "🔐 Hãy mở chat riêng với bot để nhập mã Admin."
+        )
+        return
+
+    await answer_callback(
+        callback_query,
+        "🔐 Mở chat riêng và nhập: /xuadmin <mã>"
+    )
+
+    await send_message(
+        user_id,
+        "🛠️ PHẦN MỀM ADMIN\n\n"
+        "Vui lòng nhập mã tài khoản Admin.\n\n"
+        "Cú pháp:\n"
+        "<code>/xuadmin MÃ_ADMIN</code>\n\n"
+        "🔐 Mã được xử lý trong chat riêng."
+    )
+
+
+COMMAND_HANDLERS["xuadmin"] = command_xu_admin_code
+
+
+# ============================================================
+# ĐĂNG KÝ CALLBACK ADMIN
+# ============================================================
+
+async def handle_xu_admin_callback(callback_query):
+    data = callback_query.get("data", "")
+
+    if data == "xu_admin":
+        await xu_admin_callback(callback_query)
+        return True
+
+    return False
+
 if __name__ == "__main__":
 
     try:
