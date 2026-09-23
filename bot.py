@@ -478,7 +478,8 @@ async def send_message(
     chat_id,
     text,
     reply_to=None,
-    parse_mode="HTML"
+    parse_mode="HTML",
+    reply_markup=None
 ):
 
     data = {
@@ -487,20 +488,21 @@ async def send_message(
     }
 
     if parse_mode:
-
         data["parse_mode"] = parse_mode
 
     if reply_to:
+        data["reply_to_message_id"] = reply_to
 
-        data[
-            "reply_to_message_id"
-        ] = reply_to
+    if reply_markup is not None:
+        data["reply_markup"] = json.dumps(
+            reply_markup,
+            ensure_ascii=False
+        )
 
     return await api(
         "sendMessage",
         data
     )
-
 
 async def delete_message(
     chat_id,
@@ -2329,23 +2331,33 @@ async def noichu_finish(chat_id, winner_id):
 # ============================================================
 
 def start_main_keyboard():
+
     return {
         "inline_keyboard": [
+
             [
                 {
                     "text": "👑 Quản trị",
                     "callback_data": "start_admin"
                 }
             ],
+
+            [
+                {
+                    "text": "🎲 Tài Xỉu Ảo",
+                    "callback_data": "start_taixiu"
+                }
+            ],
+
             [
                 {
                     "text": "🧰 Tiện ích khác",
                     "callback_data": "start_utils"
                 }
             ]
+
         ]
     }
-
 
 def start_back_keyboard():
     return {
@@ -2509,6 +2521,36 @@ async def handle_start_menu_callback(callback):
         text = start_admin_text()
         keyboard = start_back_keyboard()
 
+    elif data == "start_taixiu":
+        user_id = (callback.get("from") or {}).get("id", 0)
+
+        account = get_xu_account(user_id)
+
+        if account and account[4] == 1:
+            balance = "∞"
+        else:
+            balance = f"{get_xu(user_id):.2f}"
+
+        text = (
+            "🎲 <b>TÀI XỈU ẢO</b>\n\n"
+            f"💰 <b>Xu của bạn:</b> <code>{balance}</code>\n\n"
+            "🎲 <b>Tài Xỉu</b>\n"
+            "Dùng:\n"
+            "<code>/taixiu tai 10</code>\n"
+            "<code>/taixiu xiu 10</code>\n\n"
+            "🎯 Cược tối thiểu: <b>10 Xu</b>\n"
+            "🏆 Thắng: nhận <b>2× tiền cược</b>\n"
+            "💸 Thua: mất tiền cược\n\n"
+            "🎯 <b>Nhiệm vụ</b>\n"
+            "<code>/nhiemvu</code>\n\n"
+            "💰 <b>Ví Xu</b>\n"
+            "<code>/xume</code>\n\n"
+            "📉 <b>Xu đã mất</b>\n"
+            "<code>/xudamat</code>"
+        )
+
+        keyboard = start_back_keyboard()
+
     elif data == "start_utils":
 
         text = start_utils_text()
@@ -2641,6 +2683,16 @@ HELP_TEXT = (
     "/levelbxh → Xem bảng xếp hạng level\n"
     "/leveldanhsach → Xem điều kiện lên level\n"
     "/levelnhiemvu → Xem nhiệm vụ tiếp theo\n\n"
+
+    "\n💰 HỆ THỐNG XU\n"
+    "/xume → Xem số Xu và thông tin tài khoản\n"
+    "/xudamat → Xem tổng Xu đã mất\n"
+    "/nhapcode khoinghieptanthu → Nhận 100 Xu tân thủ\n"
+    "/nhiemvu → Xem nhiệm vụ nhận Xu\n"
+    "/chiasebot → Chia sẻ bot nhận Xu\n"
+    "/taixiu tai 10 → Cược Tài\n"
+    "/taixiu xiu 10 → Cược Xỉu\n"
+    "/xuadmin MÃ → Kích hoạt phần mềm Admin\n\n"
 
     "🎮 TRÒ CHƠI — NỐI CHỮ VIỆT NAM\n"
     "/noichu → Mở trò chơi Nối Chữ\n"
@@ -7896,17 +7948,24 @@ async def process_callback_update(
     if not callback:
         return
 
-    # Menu /start
+    # ==========================================
+    # MENU /START
+    # ==========================================
+
     if await handle_start_menu_callback(
         callback
     ):
         return
 
     data = callback.get(
-        "data"
+        "data",
+        ""
     )
 
-    # Điểm danh
+    # ==========================================
+    # ĐIỂM DANH
+    # ==========================================
+
     if data == "daily_checkin":
 
         await handle_daily_checkin(
@@ -7914,6 +7973,93 @@ async def process_callback_update(
         )
 
         return
+
+    # ==========================================
+    # NỐI CHỮ - THAM GIA
+    # ==========================================
+
+    if data.startswith(
+        "noichu_join:"
+    ):
+
+        try:
+
+            handled = await handle_noichu_callback(
+                callback
+            )
+
+            if handled:
+                return
+
+        except Exception as e:
+
+            logger.exception(
+                "NOICHU CALLBACK ERROR: %s",
+                e
+            )
+
+            await answer_callback(
+                callback.get("id"),
+                "❌ Lỗi khi tham gia game."
+            )
+
+            return
+
+    # ==========================================
+    # XU - ADMIN
+    # ==========================================
+
+    if data == "xu_admin":
+
+        try:
+
+            await xu_admin_callback(
+                callback
+            )
+
+        except Exception as e:
+
+            logger.exception(
+                "XU ADMIN CALLBACK ERROR: %s",
+                e
+            )
+
+            await answer_callback(
+                callback.get("id"),
+                "❌ Lỗi phần mềm Admin."
+            )
+
+        return
+
+    # ==========================================
+    # XU - CHIA SẺ BOT
+    # ==========================================
+
+    if data == "xu_share_done":
+
+        try:
+
+            await xu_share_done_callback(
+                callback
+            )
+
+        except Exception as e:
+
+            logger.exception(
+                "XU SHARE CALLBACK ERROR: %s",
+                e
+            )
+
+            await answer_callback(
+                callback.get("id"),
+                "❌ Không thể ghi nhận lượt chia sẻ."
+            )
+
+        return
+
+    # ==========================================
+    # CALLBACK KHÔNG HỢP LỆ
+    # ==========================================
 
     await answer_callback(
         callback.get("id"),
@@ -9304,6 +9450,60 @@ async def process_update(
             message
         )
 
+    # ==========================================
+    # XU - ĐẾM TIN NHẮN NHIỆM VỤ
+    # ==========================================
+
+    try:
+
+        await xu_count_message_task(
+            message
+        )
+
+    except Exception as e:
+
+        logger.exception(
+            "XU MESSAGE TASK ERROR: %s",
+            e
+        )
+
+    # ==========================================
+    # XU - ĐẾM THÀNH VIÊN MỚI
+    # ==========================================
+
+    try:
+
+        await xu_count_new_member_task(
+            message
+        )
+
+    except Exception as e:
+
+        logger.exception(
+            "XU MEMBER TASK ERROR: %s",
+            e
+        )
+
+    # ==========================================
+    # NỐI CHỮ
+    # ==========================================
+
+    try:
+
+        noichu_handled = await noichu_handle_text(
+            message
+        )
+
+        if noichu_handled:
+            return
+
+    except Exception as e:
+
+        logger.exception(
+            "NOICHU MESSAGE ERROR: %s",
+            e
+        )
+
 # ============================================================
 # LEVEL - TỰ ĐỘNG ĐẾM TIN NHẮN
 # ============================================================
@@ -9720,8 +9920,43 @@ async def set_bot_commands():
         {
             "command": "diemdanh",
             "description": "Điểm danh"
+        },
+
+        {
+            "command": "xume",
+            "description": "Xem Xu"
+        },
+
+        {
+            "command": "xudamat",
+            "description": "Xem Xu đã mất"
+        },
+
+        {
+            "command": "nhapcode",
+            "description": "Nhập code tân thủ"
+        },
+
+        {
+            "command": "nhiemvu",
+            "description": "Xem nhiệm vụ Xu"
+        },
+
+        {
+            "command": "chiasebot",
+            "description": "Chia sẻ bot nhận Xu"
+        },
+
+        {
+            "command": "taixiu",
+            "description": "Chơi Tài Xỉu"
+        },
+
+        {
+            "command": "xuadmin",
+            "description": "Phần mềm Admin Xu"
         }
-    ]
+        ]
 
     result = await api(
         "setMyCommands",
@@ -10336,6 +10571,15 @@ async def command_nhapcode(message, args=None):
         )
         return
 
+    account = get_xu_account(user_id)
+
+    if account and int(account[3]) == 1:
+        await send_message(
+            chat_id(message),
+            "❌ Code tân thủ này đã được sử dụng trước đó."
+        )
+        return
+
     # Cộng 100 Xu và đánh dấu đã dùng
     conn = sqlite3.connect(DATABASE)
     cur = conn.cursor()
@@ -10461,7 +10705,6 @@ async def command_nhiemvu(message, args=None):
         "🎯 NHIỆM VỤ XU\n\n"
 
         "🟢 NHIỆM VỤ DỄ — +20 Xu\n"
-        f"💬 Gửi 50 tin nhắn: {status(easy_message_done)}\n"
         f"👥 Thêm 1 thành viên: {status(easy_add_done)}\n"
         f"🔗 Chia sẻ bot 1 lần: {status(easy_share_done)}\n\n"
 
@@ -10842,7 +11085,7 @@ async def xu_share_done_callback(callback_query):
         conn.close()
 
         await answer_callback(
-            callback_query,
+            callback_query.get("id"),
             "🎉 +20 Xu"
         )
 
@@ -10872,16 +11115,16 @@ async def xu_share_done_callback(callback_query):
         conn.close()
 
         await answer_callback(
-            callback_query,
+            callback_query.get("id"),
             "🎉 +100 Xu"
         )
 
         return
 
-    await answer_callback(
-        callback_query,
-        f"Đã ghi nhận lượt chia sẻ: {bot_shared}"
-    )
+        await answer_callback(
+            callback_query.get("id"),
+            f"Đã ghi nhận lượt chia sẻ: {bot_shared}"
+        )
 
 
 COMMAND_HANDLERS["chiasebot"] = command_chiasebot
@@ -11118,13 +11361,13 @@ async def xu_admin_callback(callback_query):
 
     if callback_chat.get("type") != "private":
         await answer_callback(
-            callback_query,
+            callback_query.get("id"),
             "🔐 Hãy mở chat riêng với bot để nhập mã Admin."
         )
         return
 
     await answer_callback(
-        callback_query,
+        callback_query.get("id"),
         "🔐 Mở chat riêng và nhập: /xuadmin <mã>"
     )
 
