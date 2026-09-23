@@ -11136,6 +11136,10 @@ COMMAND_HANDLERS["chiasebot"] = command_chiasebot
 # ============================================================
 
 async def command_taixiu(message, args=None):
+    # Chuẩn hóa args: dispatch hiện tại truyền vào dạng chuỗi
+    if isinstance(args, str):
+        args = args.split()
+
     user = from_user(message)
 
     if not user:
