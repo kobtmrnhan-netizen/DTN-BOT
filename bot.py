@@ -11337,7 +11337,7 @@ async def command_taixiu(
     ):
         await send_message(
             chat_id(message),
-            "không có tiền thì cút bớt chơi đếm"
+            "đặt nhiều lên sợ gì"
         )
         return
 
