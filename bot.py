@@ -937,6 +937,13 @@ def is_private(message):
         == PRIVATE_TYPE
     )
 
+def user_id(message):
+    user = from_user(message)
+
+    if not user:
+        return None
+
+    return user.get("id")
 
 def chat_id(message):
 
