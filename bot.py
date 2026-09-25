@@ -10208,8 +10208,10 @@ async def cache_message_profile(
     )
 
 # ============================================================
-# FIX DISPATCH COMMAND - HỖ TRỢ CẢ 2 KIỂU HANDLER
+# FIX DISPATCH COMMAND - HỖ TRỢ HANDLER 1 HOẶC 2 ARG
 # ============================================================
+
+import inspect
 
 async def dispatch_command(message):
 
@@ -10224,11 +10226,14 @@ async def dispatch_command(message):
         return
 
     try:
-        # Các handler mới:
-        # handler(message, args)
-        result = handler(message, args)
+        params = inspect.signature(handler).parameters
 
-        if asyncio.iscoroutine(result):
+        if len(params) >= 2:
+            result = handler(message, args)
+        else:
+            result = handler(message)
+
+        if inspect.isawaitable(result):
             await result
 
     except Exception as e:
