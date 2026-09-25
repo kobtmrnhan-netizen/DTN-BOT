@@ -592,7 +592,7 @@ async def command_thangcap(message, args=""):
     if not is_group(message):
         await send_message(
             chat_id(message),
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+            "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
         )
         return
 
@@ -704,7 +704,7 @@ async def command_thanhtuuhientai(message, args=""):
     if not is_group(message):
         await send_message(
             chat_id(message),
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+            "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
         )
         return
 
@@ -1556,7 +1556,7 @@ async def command_level(message, args=None):
     if not is_group(message):
         await send_message(
             message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+            "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
         )
         return
 
@@ -1605,7 +1605,7 @@ async def command_levelyou(message, args=None):
     if not is_group(message):
         await send_message(
             message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+            "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
         )
         return
 
@@ -1640,7 +1640,7 @@ async def command_leveldanhsach(message, args=None):
     if not is_group(message):
         await send_message(
             message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+            "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
         )
         return
 
@@ -1670,7 +1670,7 @@ async def command_levelnhiemvu(message, args=None):
     if not is_group(message):
         await send_message(
             message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+            "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
         )
         return
 
@@ -1719,7 +1719,7 @@ async def command_levelbxh(message, args=None):
     if not is_group(message):
         await send_message(
             message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+            "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
         )
         return
 
@@ -1923,7 +1923,7 @@ async def command_noichu(message, args=None):
     if not is_group(message):
         await send_message(
             message["chat"]["id"],
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+            "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
         )
         return
 
@@ -2672,7 +2672,7 @@ async def command_bxhchat(message, args=""):
     if not is_group(message):
         await send_message(
             chat_id(message),
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+            "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
         )
         return
 
@@ -2752,7 +2752,7 @@ async def command_bxhxu(message, args=""):
     if not is_group(message):
         await send_message(
             chat_id(message),
-            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+            "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
         )
         return
 
@@ -2846,9 +2846,9 @@ ACHIEVEMENTS = [
     {
         "key": "legendary",
         "name": "👑 Legendary — Huyền thoại",
-        "description": "Reach Level 6 (Max) — Đạt Level 6 (Max)",
+        "description": "Reach Level 10 (Max) — Đạt Level 10 (Max)",
         "metric": "level",
-        "value": 6,
+        "value": 10,
     },
 
     # ==================== CHAT ====================
