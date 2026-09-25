@@ -188,6 +188,18 @@ def init_db():
 
         conn.executescript(
             """
+            CREATE TABLE IF NOT EXISTS achievements (
+                chat_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                achievement_key TEXT NOT NULL,
+                unlocked_at TEXT NOT NULL,
+                PRIMARY KEY (
+                    chat_id,
+                    user_id,
+                    achievement_key
+                )
+            );
+
             CREATE TABLE IF NOT EXISTS levels (
                 chat_id INTEGER NOT NULL,
                 user_id INTEGER NOT NULL,
@@ -572,6 +584,227 @@ async def unpin_message(
 # ============================================================
 # USER HELPERS
 # ============================================================
+
+# ============================================================
+# THĂNG CẤP / PROMOTE
+# ============================================================
+
+async def command_thangcap(message, args=""):
+    if not is_group(message):
+        await send_message(
+            chat_id(message),
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    if not await is_admin(message):
+        await send_message(
+            chat_id(message),
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+        return
+
+    target_id = None
+
+    reply = message.get("reply_to_message")
+    if reply:
+        target_id = user_id(reply.get("from"))
+
+    if not target_id and args:
+        value = args.split()[0]
+
+        if value.startswith("@"):
+            target_id = await resolve_username(value)
+
+        elif value.isdigit():
+            target_id = int(value)
+
+    if not target_id:
+        await send_message(
+            chat_id(message),
+            "❌ Hãy reply tin nhắn của người cần thăng cấp hoặc dùng:\n"
+            "<code>/thangcap @username</code>\n"
+            "<code>/thangcap user_id</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    if target_id == user_id(message):
+        await send_message(
+            chat_id(message),
+            "❌ Bạn không thể tự thăng cấp chính mình."
+        )
+        return
+
+    target = await get_chat_member(
+        chat_id(message),
+        target_id
+    )
+
+    if not target:
+        await send_message(
+            chat_id(message),
+            "❌ Không tìm thấy thành viên này."
+        )
+        return
+
+    target_status = target.get("status")
+
+    if target_status == "creator":
+        await send_message(
+            chat_id(message),
+            "❌ Không thể thăng cấp chủ nhóm."
+        )
+        return
+
+    if target_status == "administrator":
+        await send_message(
+            chat_id(message),
+            "⚠️ Người này đã là quản trị viên."
+        )
+        return
+
+    result = await api(
+        "promoteChatMember",
+        {
+            "chat_id": chat_id(message),
+            "user_id": target_id,
+
+            "can_manage_chat": True,
+            "can_delete_messages": True,
+            "can_manage_video_chats": True,
+            "can_restrict_members": True,
+            "can_change_info": True,
+            "can_invite_users": True,
+            "can_pin_messages": True,
+            "can_manage_topics": True,
+
+            "can_promote_members": False
+        }
+    )
+
+    if not result.get("ok"):
+        await send_message(
+            chat_id(message),
+            "❌ Không thể thăng cấp người này.\n"
+            "Hãy kiểm tra quyền của Ngọc Mỹ."
+        )
+        return
+
+    await send_message(
+        chat_id(message),
+        f"👑 Đã thăng cấp <code>{target_id}</code> thành quản trị viên.",
+        parse_mode="HTML"
+    )
+
+# ============================================================
+# THÀNH TỰU HIỆN TẠI
+# ============================================================
+
+async def command_thanhtuuhientai(message, args=""):
+    if not is_group(message):
+        await send_message(
+            chat_id(message),
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    cid = chat_id(message)
+    uid = user_id(message)
+
+    rows = await adb_execute(
+        """
+        SELECT achievement_key, unlocked_at
+        FROM achievements
+        WHERE chat_id = ?
+          AND user_id = ?
+        ORDER BY unlocked_at ASC
+        """,
+        (cid, uid),
+        fetch=True
+    )
+
+    unlocked = {
+        row["achievement_key"]: row
+        for row in rows
+    }
+
+    if not unlocked:
+        await send_message(
+            cid,
+            "🏆 <b>THÀNH TỰU HIỆN TẠI</b>\n\n"
+            "Bạn chưa mở khóa thành tựu nào.\n"
+            "Hãy tiếp tục hoạt động để mở khóa thành tựu! 🔥",
+            parse_mode="HTML"
+        )
+        return
+
+    lines = [
+        "🏆 <b>THÀNH TỰU HIỆN TẠI</b>",
+        ""
+    ]
+
+    for achievement in ACHIEVEMENTS:
+        key = achievement["key"]
+
+        if key not in unlocked:
+            continue
+
+        name = achievement["name"]
+        metric = achievement["metric"]
+        value = achievement["value"]
+
+        # Mức độ xịn / khó
+        if metric == "level":
+            xin = 5
+            kho = 5
+            progress_text = f"Level {value}"
+
+        elif metric == "messages":
+            if value >= 10000:
+                xin = 5
+                kho = 5
+            elif value >= 5000:
+                xin = 4
+                kho = 4
+            else:
+                xin = 3
+                kho = 3
+
+            progress_text = f"{value:,} messages"
+
+        elif metric == "xu":
+            if value >= 100000:
+                xin = 5
+                kho = 5
+            elif value >= 10000:
+                xin = 5
+                kho = 4
+            elif value >= 1000:
+                xin = 4
+                kho = 3
+            else:
+                xin = 3
+                kho = 2
+
+            progress_text = f"{value:,} Xu"
+
+        else:
+            xin = 3
+            kho = 3
+            progress_text = f"{value}"
+
+        lines.append(
+            f"🏅 <b>{name}</b>\n"
+            f"⭐ Xịn: {xin}/5 | 🔥 Khó: {kho}/5\n"
+            f"📊 {progress_text}\n"
+        )
+
+    await send_message(
+        cid,
+        "\n".join(lines),
+        parse_mode="HTML"
+    )
 
 def user_name(user):
 
@@ -2420,12 +2653,652 @@ def start_admin_text():
         "<code>/antilink on|off</code> — Chống link.\n"
         "<code>/antibuff on|off</code> — Chống buff thành viên.\n"
         "<code>/antifake on|off</code> — Chống giả mạo."
+
+        "👑 <b>/thangcap</b> – Thăng cấp thành viên thành quản trị viên.\n"
+        "Cách dùng: <code>/thangcap @username</code> hoặc reply tin nhắn rồi dùng <code>/thangcap</code>.\n\n"
     )
 
+# ============================================================
+# BẢNG XẾP HẠNG CHAT
+# ============================================================
+
+async def command_bxhchat(message, args=""):
+    if not is_group(message):
+        await send_message(
+            chat_id(message),
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    rows = await adb_execute(
+        """
+        SELECT
+            user_id,
+            username,
+            first_name,
+            message_count
+        FROM levels
+        WHERE chat_id = ?
+        ORDER BY message_count DESC
+        LIMIT 10
+        """,
+        (
+            chat_id(message),
+        ),
+        fetch=True
+    )
+
+    if not rows:
+        await send_message(
+            chat_id(message),
+            "📊 Chưa có dữ liệu xếp hạng chat trong nhóm."
+        )
+        return
+
+    lines = [
+        "🏆 <b>BẢNG XẾP HẠNG CHAT</b>",
+        "",
+        "📊 Top 10 thành viên gửi nhiều tin nhắn nhất:",
+        ""
+    ]
+
+    medals = [
+        "🥇",
+        "🥈",
+        "🥉"
+    ]
+
+    for index, row in enumerate(rows, 1):
+
+        user_id = row["user_id"]
+        username = row["username"]
+        first_name = row["first_name"] or "Không tên"
+        message_count = row["message_count"] or 0
+
+        if username:
+            display_name = f"@{username}"
+        else:
+            display_name = first_name
+
+        prefix = (
+            medals[index - 1]
+            if index <= 3
+            else f"<b>{index}.</b>"
+        )
+
+        lines.append(
+            f"{prefix} {display_name} — "
+            f"<code>{message_count}</code> tin nhắn"
+        )
+
+    await send_message(
+        chat_id(message),
+        "\n".join(lines),
+        parse_mode="HTML"
+    )
+
+# ============================================================
+# BẢNG XẾP HẠNG XU
+# ============================================================
+
+async def command_bxhxu(message, args=""):
+
+    if not is_group(message):
+        await send_message(
+            chat_id(message),
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                x.user_id,
+                x.xu,
+                x.admin_mode,
+                u.username,
+                u.first_name
+            FROM xu_accounts x
+            LEFT JOIN users u
+                ON u.user_id = x.user_id
+            ORDER BY
+                x.admin_mode DESC,
+                x.xu DESC
+            LIMIT 10
+            """
+        ).fetchall()
+
+    finally:
+        conn.close()
+
+    if not rows:
+        await send_message(
+            chat_id(message),
+            "🏆 Chưa có dữ liệu xếp hạng Xu."
+        )
+        return
+
+    lines = [
+        "🏆 <b>BẢNG XẾP HẠNG XU</b>",
+        "",
+        "💰 Top 10 người có nhiều Xu nhất:",
+        ""
+    ]
+
+    medals = [
+        "🥇",
+        "🥈",
+        "🥉"
+    ]
+
+    for index, row in enumerate(rows, 1):
+
+        user_id = row["user_id"]
+        username = row["username"]
+        first_name = row["first_name"] or "Không tên"
+
+        if row["admin_mode"] == 1:
+            balance = "∞"
+        else:
+            balance = f"{float(row['xu']):.2f}"
+
+        if username:
+            display_name = f"@{html.escape(username)}"
+        else:
+            display_name = html.escape(first_name)
+
+        prefix = (
+            medals[index - 1]
+            if index <= 3
+            else f"<b>{index}.</b>"
+        )
+
+        lines.append(
+            f"{prefix} {display_name} — "
+            f"💰 <code>{balance} Xu</code>"
+        )
+
+    await send_message(
+        chat_id(message),
+        "\n".join(lines),
+        parse_mode="HTML"
+    )
+
+# ============================================================
+# ACHIEVEMENT SYSTEM
+# ENGLISH + TIẾNG VIỆT
+# ============================================================
+
+ACHIEVEMENTS = [
+
+    # ==================== LEVEL ====================
+
+    {
+        "key": "legendary",
+        "name": "👑 Legendary — Huyền thoại",
+        "description": "Reach Level 6 (Max) — Đạt Level 6 (Max)",
+        "metric": "level",
+        "value": 6,
+    },
+
+    # ==================== CHAT ====================
+
+    {
+        "key": "chat_100",
+        "name": "🌱 Getting Started — Khởi đầu",
+        "description": "Send 100 messages — Gửi 100 tin nhắn",
+        "metric": "chat_messages",
+        "value": 100,
+    },
+
+    {
+        "key": "chat_1000",
+        "name": "🔥 Hard Worker — Chăm chỉ",
+        "description": "Send 1,000 messages — Gửi 1.000 tin nhắn",
+        "metric": "chat_messages",
+        "value": 1000,
+    },
+
+    {
+        "key": "chat_2000",
+        "name": "⚡ Persistent — Bền bỉ",
+        "description": "Send 2,000 messages — Gửi 2.000 tin nhắn",
+        "metric": "chat_messages",
+        "value": 2000,
+    },
+
+    {
+        "key": "chat_5000",
+        "name": "🚀 Chat Master — Cao thủ chat",
+        "description": "Send 5,000 messages — Gửi 5.000 tin nhắn",
+        "metric": "chat_messages",
+        "value": 5000,
+    },
+
+    {
+        "key": "the_king_chats",
+        "name": "💬 The King Chats — Vua chat",
+        "description": "Send 10,000 messages — Gửi 10.000 tin nhắn",
+        "metric": "chat_messages",
+        "value": 10000,
+    },
+
+    {
+        "key": "chat_20000",
+        "name": "🌌 Endless Chatter — Chat bất tận",
+        "description": "Send 20,000 messages — Gửi 20.000 tin nhắn",
+        "metric": "chat_messages",
+        "value": 20000,
+    },
+
+    {
+        "key": "chat_50000",
+        "name": "🛰️ Super Active — Siêu hoạt động",
+        "description": "Send 50,000 messages — Gửi 50.000 tin nhắn",
+        "metric": "chat_messages",
+        "value": 50000,
+    },
+
+    {
+        "key": "chat_100000",
+        "name": "🌠 Chat Universe — Vũ trụ chat",
+        "description": "Send 100,000 messages — Gửi 100.000 tin nhắn",
+        "metric": "chat_messages",
+        "value": 100000,
+    },
+
+    # ==================== XU ====================
+
+    {
+        "key": "xu_100",
+        "name": "🪙 First Coin — Đồng xu đầu tiên",
+        "description": "Own 100 Xu — Sở hữu 100 Xu",
+        "metric": "xu",
+        "value": 100,
+    },
+
+    {
+        "key": "xu_500",
+        "name": "💵 Getting Rich — Có của",
+        "description": "Own 500 Xu — Sở hữu 500 Xu",
+        "metric": "xu",
+        "value": 500,
+    },
+
+    {
+        "key": "tycoon",
+        "name": "💰 Tycoon — Đại gia",
+        "description": "Own 1,000 Xu — Sở hữu 1.000 Xu",
+        "metric": "xu",
+        "value": 1000,
+    },
+
+    {
+        "key": "xu_5000",
+        "name": "🏦 Treasurer — Kho bạc",
+        "description": "Own 5,000 Xu — Sở hữu 5.000 Xu",
+        "metric": "xu",
+        "value": 5000,
+    },
+
+    {
+        "key": "typhu",
+        "name": "💎 Billionaire — Tỉ phú",
+        "description": "Own 10,000 Xu — Sở hữu 10.000 Xu",
+        "metric": "xu",
+        "value": 10000,
+    },
+
+    {
+        "key": "xu_50000",
+        "name": "💰 Treasure Hoard — Kho báu",
+        "description": "Own 50,000 Xu — Sở hữu 50.000 Xu",
+        "metric": "xu",
+        "value": 50000,
+    },
+
+    {
+        "key": "xu_100000",
+        "name": "👑 Grand Treasury — Đại kho bạc",
+        "description": "Own 100,000 Xu — Sở hữu 100.000 Xu",
+        "metric": "xu",
+        "value": 100000,
+    },
+
+    # ==================== CHECK-IN ====================
+
+    {
+        "key": "checkin_1",
+        "name": "🔥 First Check-in — Điểm danh đầu tiên",
+        "description": "Check in once — Điểm danh 1 lần",
+        "metric": "checkins",
+        "value": 1,
+    },
+
+    {
+        "key": "checkin_7",
+        "name": "📅 Weekly Grinder — Tuần chăm chỉ",
+        "description": "7 check-ins — Điểm danh 7 lần",
+        "metric": "checkins",
+        "value": 7,
+    },
+
+    {
+        "key": "checkin_30",
+        "name": "🗓️ Monthly Grinder — Tháng chăm chỉ",
+        "description": "30 check-ins — Điểm danh 30 lần",
+        "metric": "checkins",
+        "value": 30,
+    },
+
+    {
+        "key": "checkin_100",
+        "name": "🏅 Hundred Days — Trăm ngày",
+        "description": "100 check-ins — Điểm danh 100 lần",
+        "metric": "checkins",
+        "value": 100,
+    },
+
+    {
+        "key": "checkin_365",
+        "name": "🏆 One Year — Một năm",
+        "description": "365 check-ins — Điểm danh 365 lần",
+        "metric": "checkins",
+        "value": 365,
+    },
+
+    # ==================== STREAK ====================
+
+    {
+        "key": "streak_7",
+        "name": "🔥 Streak 7 — Chuỗi 7 ngày",
+        "description": "7-day streak — Chuỗi 7 ngày",
+        "metric": "max_streak",
+        "value": 7,
+    },
+
+    {
+        "key": "streak_30",
+        "name": "🔥 Streak 30 — Chuỗi 30 ngày",
+        "description": "30-day streak — Chuỗi 30 ngày",
+        "metric": "max_streak",
+        "value": 30,
+    },
+
+    {
+        "key": "streak_100",
+        "name": "🔥 Streak 100 — Chuỗi 100 ngày",
+        "description": "100-day streak — Chuỗi 100 ngày",
+        "metric": "max_streak",
+        "value": 100,
+    },
+
+    {
+        "key": "streak_365",
+        "name": "🔥 Streak 365 — Chuỗi 365 ngày",
+        "description": "365-day streak — Chuỗi 365 ngày",
+        "metric": "max_streak",
+        "value": 365,
+    },
+
+    # ==================== MEMBER ====================
+
+    {
+        "key": "member_7d",
+        "name": "🌱 7-Day Member — Thành viên 7 ngày",
+        "description": "7 days — 7 ngày",
+        "metric": "account_days",
+        "value": 7,
+    },
+
+    {
+        "key": "member_30d",
+        "name": "🌿 30-Day Member — Thành viên 30 ngày",
+        "description": "30 days — 30 ngày",
+        "metric": "account_days",
+        "value": 30,
+    },
+
+    {
+        "key": "member_90d",
+        "name": "🌳 90-Day Member — Thành viên 90 ngày",
+        "description": "90 days — 90 ngày",
+        "metric": "account_days",
+        "value": 90,
+    },
+
+    {
+        "key": "member_180d",
+        "name": "🏕️ 180-Day Member — Thành viên 180 ngày",
+        "description": "180 days — 180 ngày",
+        "metric": "account_days",
+        "value": 180,
+    },
+
+    {
+        "key": "member_365d",
+        "name": "🏰 1-Year Member — Thành viên 1 năm",
+        "description": "365 days — 365 ngày",
+        "metric": "account_days",
+        "value": 365,
+    },
+
+    {
+        "key": "member_730d",
+        "name": "👑 Veteran Member — Thành viên lâu năm",
+        "description": "2 years — 2 năm",
+        "metric": "account_days",
+        "value": 730,
+    },
+
+    # ==================== WARN ====================
+
+    {
+        "key": "warn_1",
+        "name": "⚠️ First Warning — Cảnh cáo đầu tiên",
+        "description": "Receive 1 warning — Nhận 1 cảnh cáo",
+        "metric": "warns",
+        "value": 1,
+    },
+
+    {
+        "key": "warn_5",
+        "name": "⚠️ Warning Survivor — Kẻ sống sót",
+        "description": "Receive 5 warnings — Nhận 5 cảnh cáo",
+        "metric": "warns",
+        "value": 5,
+    },
+
+    {
+        "key": "warn_10",
+        "name": "🛡️ Warning Veteran — Trùm cảnh cáo",
+        "description": "Receive 10 warnings — Nhận 10 cảnh cáo",
+        "metric": "warns",
+        "value": 10,
+    },
+
+    {
+        "key": "warn_20",
+        "name": "☠️ Warning Boss — Boss cảnh cáo",
+        "description": "Receive 20 warnings — Nhận 20 cảnh cáo",
+        "metric": "warns",
+        "value": 20,
+    },
+
+    # ==================== INVITE ====================
+
+    {
+        "key": "invite_1",
+        "name": "🤝 Connector — Người kết nối",
+        "description": "Invite 1 person — Mời 1 người",
+        "metric": "people_added",
+        "value": 1,
+    },
+
+    {
+        "key": "invite_5",
+        "name": "👥 Guide — Người dẫn đường",
+        "description": "Invite 5 people — Mời 5 người",
+        "metric": "people_added",
+        "value": 5,
+    },
+
+    {
+        "key": "invite_10",
+        "name": "🚪 Team Builder — Mở rộng đội hình",
+        "description": "Invite 10 people — Mời 10 người",
+        "metric": "people_added",
+        "value": 10,
+    },
+
+    {
+        "key": "invite_25",
+        "name": "🌐 Recruiter — Nhà tuyển dụng",
+        "description": "Invite 25 people — Mời 25 người",
+        "metric": "people_added",
+        "value": 25,
+    },
+
+    {
+        "key": "invite_50",
+        "name": "👑 Recruitment Boss — Ông trùm tuyển thành viên",
+        "description": "Invite 50 people — Mời 50 người",
+        "metric": "people_added",
+        "value": 50,
+    },
+
+    # ==================== TASK ====================
+
+    {
+        "key": "task_100",
+        "name": "💬 Task Chatter — Nhiệm vụ chat",
+        "description": "100 task messages — 100 tin nhiệm vụ",
+        "metric": "task_messages",
+        "value": 100,
+    },
+
+    {
+        "key": "task_500",
+        "name": "🔥 Task Grinder — Cày nhiệm vụ",
+        "description": "500 task messages — 500 tin nhiệm vụ",
+        "metric": "task_messages",
+        "value": 500,
+    },
+
+    {
+        "key": "task_1000",
+        "name": "⚡ Task Machine — Máy nhiệm vụ",
+        "description": "1,000 task messages — 1.000 tin nhiệm vụ",
+        "metric": "task_messages",
+        "value": 1000,
+    },
+
+    {
+        "key": "share_1",
+        "name": "📢 Messenger — Người truyền tin",
+        "description": "Share the bot once — Chia sẻ bot 1 lần",
+        "metric": "bot_shared",
+        "value": 1,
+    },
+
+    # ==================== LOST XU ====================
+
+    {
+        "key": "lost_100",
+        "name": "💸 Lost Some Money — Biết mùi mất Xu",
+        "description": "Lose 100 Xu — Mất 100 Xu",
+        "metric": "xu_lost",
+        "value": 100,
+    },
+
+    {
+        "key": "lost_1000",
+        "name": "😭 Broke Wallet — Cháy ví",
+        "description": "Lose 1,000 Xu — Mất 1.000 Xu",
+        "metric": "xu_lost",
+        "value": 1000,
+    },
+
+    {
+        "key": "lost_5000",
+        "name": "💀 Heavy Loss — Đại cháy ví",
+        "description": "Lose 5,000 Xu — Mất 5.000 Xu",
+        "metric": "xu_lost",
+        "value": 5000,
+    },
+
+    {
+        "key": "lost_10000",
+        "name": "☠️ Bankrupt — Phá sản",
+        "description": "Lose 10,000 Xu — Mất 10.000 Xu",
+        "metric": "xu_lost",
+        "value": 10000,
+    },
+
+    {
+        "key": "lost_50000",
+        "name": "💸 Mega Bankruptcy — Đại phá sản",
+        "description": "Lose 50,000 Xu — Mất 50.000 Xu",
+        "metric": "xu_lost",
+        "value": 50000,
+    },
+
+    # ==================== GLOBAL CHAT ====================
+
+    {
+        "key": "global_1000",
+        "name": "🌟 Active Account — Tài khoản hoạt động",
+        "description": "1,000 total messages — 1.000 tin nhắn",
+        "metric": "global_messages",
+        "value": 1000,
+    },
+
+    {
+        "key": "global_5000",
+        "name": "🌟 Active User — Người dùng tích cực",
+        "description": "5,000 total messages — 5.000 tin nhắn",
+        "metric": "global_messages",
+        "value": 5000,
+    },
+
+    {
+        "key": "global_10000",
+        "name": "🌟 Notable User — Người dùng nổi bật",
+        "description": "10,000 total messages — 10.000 tin nhắn",
+        "metric": "global_messages",
+        "value": 10000,
+    },
+
+    {
+        "key": "global_50000",
+        "name": "🌟 Veteran User — Người dùng kỳ cựu",
+        "description": "50,000 total messages — 50.000 tin nhắn",
+        "metric": "global_messages",
+        "value": 50000,
+    },
+
+    {
+        "key": "global_100000",
+        "name": "💥 Super Account — Siêu tài khoản",
+        "description": "100,000 total messages — 100.000 tin nhắn",
+        "metric": "global_messages",
+        "value": 100000,
+    },
+]
 
 def start_utils_text():
     return (
         "🧰 <b>TIỆN ÍCH KHÁC</b>\n\n"
+
+        "🏆 <b>BẢNG XẾP HẠNG CHAT</b>\n"
+        "<code>/bxhchat</code> — Xem Top 10 thành viên chat nhiều nhất trong nhóm.\n\n"
+
+        "🏆 <b>/thanhtuuhientai</b> — Xem các thành tựu đã mở khóa.\n"
+        "Cách dùng: <code>/thanhtuuhientai</code>\n\n"
 
         "⭐ <b>LEVEL</b>\n"
         "<code>/level</code> — Xem hệ thống level.\n"
@@ -2546,6 +3419,8 @@ async def handle_start_menu_callback(callback):
             "💸 Thua: mất tiền cược\n\n"
             "🎯 <b>Nhiệm vụ</b>\n"
             "<code>/nhiemvutong</code>\n\n"
+            "🏆 <b>Bảng xếp hạng Xu</b>\n"
+            "<code>/bxhxu</code>\n\n"
             "💰 <b>Ví Xu</b>\n"
             "<code>/xume</code>\n\n"
             "📉 <b>Xu đã mất</b>\n"
@@ -2999,6 +3874,14 @@ async def command_settings(
 # ============================================================
 
 COMMAND_HANDLERS = {
+
+    "thanhtuuhientai": command_thanhtuuhientai,
+
+    "bxhxu": command_bxhxu,
+
+    "bxhchat": command_bxhchat,
+
+    "thangcap": command_thangcap,
 
     "start":
         command_start,
@@ -11612,4 +12495,3 @@ if __name__ == "__main__":
 # ============================================================
 # END PHẦN 10/10
 # ============================================================
-
