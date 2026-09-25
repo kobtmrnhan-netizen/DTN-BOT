@@ -10226,20 +10226,7 @@ async def dispatch_command(message):
     try:
         # Các handler mới:
         # handler(message, args)
-        try:
-            result = handler(message, args)
-
-        except TypeError as first_error:
-
-            # Các handler cũ:
-            # handler(message)
-            try:
-                result = handler(message)
-
-            except TypeError:
-                # Nếu lỗi TypeError thực sự nằm bên trong
-                # handler thì ném lỗi gốc ra ngoài.
-                raise first_error
+        result = handler(message, args)
 
         if asyncio.iscoroutine(result):
             await result
@@ -10258,7 +10245,8 @@ async def dispatch_command(message):
                 "❌ <b>LỖI KHI XỬ LÝ LỆNH</b>\n\n"
                 "Bot gặp lỗi nội bộ khi thực hiện lệnh.\n"
                 f"<code>{html.escape(str(e))}</code>"
-            )
+            ),
+            parse_mode="HTML"
         )
 
 # ============================================================
