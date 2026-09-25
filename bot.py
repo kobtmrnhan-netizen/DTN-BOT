@@ -93,8 +93,7 @@ GROUP_TYPES = {
 PRIVATE_TYPE = "private"
 
 PRIVATE_GROUP_MESSAGE = (
-    "sao ngươi lại ngu thế "
-    "lệnh này chỉ xài cho nhóm"
+    "lệnh này chỉ hoạt động trong nhóm,xin lỗi"
 )
 
 OWNER_ONLY_MESSAGE = (
@@ -3601,9 +3600,7 @@ async def command_help(
         await send_message(
             chat_id(message),
             (
-                "Help Cái Đầu Buồi "
-                "Chủ Tao Chưa Ra "
-                "Help Group OK"
+                "xin lỗi bạn tôi ko hỗ trợ help nhóm"
             )
         )
 
@@ -12227,7 +12224,7 @@ async def command_taixiu(
     ):
         await send_message(
             chat_id(message),
-            "đặt nhiều lên sợ gì"
+            "Bạn Hết Tiền Rồi Hãy Làm Nhiệm Vụ Để Kiếm Thêm Xu,Cảm ơn"
         )
         return
 
