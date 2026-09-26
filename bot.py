@@ -4555,6 +4555,65 @@ async def ensure_valid_target(message, target_id):
 
     return target
 
+async def ensure_valid_target(message, target_id):
+    if not target_id:
+        await send_message(
+            chat_id(message),
+            "❌ Không tìm thấy người dùng cần xử lý."
+        )
+        return None
+
+    # target_id phải là ID số
+    if isinstance(target_id, dict):
+        target_id = target_id.get("id")
+
+    try:
+        target_id = int(target_id)
+    except (TypeError, ValueError):
+        await send_message(
+            chat_id(message),
+            "❌ ID người dùng không hợp lệ."
+        )
+        return None
+
+    target = await get_chat_member(
+        chat_id(message),
+        target_id
+    )
+
+    if not target:
+        await send_message(
+            chat_id(message),
+            "❌ Không tìm thấy thành viên này."
+        )
+        return None
+
+    # Telegram API trả về object thành viên dạng dict
+    if not isinstance(target, dict):
+        await send_message(
+            chat_id(message),
+            "❌ Không đọc được thông tin thành viên."
+        )
+        return None
+
+    status = target.get("status")
+
+    if status == "creator":
+        await send_message(
+            chat_id(message),
+            "❌ Không thể xử lý chủ nhóm."
+        )
+        return None
+
+    if status == "administrator":
+        await send_message(
+            chat_id(message),
+            "❌ Không thể xử lý quản trị viên."
+        )
+        return None
+
+    return target
+
 # ============================================================
 # COMMAND TABLE
 # ============================================================
