@@ -1,41 +1,33 @@
 """
-BOT QUẢN LÝ NHÓM TELEGRAM - OSAKA
-==================================
-Bot quản lý nhóm Telegram với tên lệnh tiếng Việt, phản hồi song ngữ Việt/Anh.
+BOT QUẢN LÝ NHÓM & NHÀ CÁI TELEGRAM - OSAKA v2
+================================================
+Bot quản lý nhóm Telegram + hệ thống nhà cái Osaka
+Tính năng: Quản lý nhóm, Tiện ích, Casino, XU system
 
-DANH SÁCH LỆNH (xem chi tiết trong /help riêng tư của bot):
-  /start, /help (help chỉ hoạt động khi nhắn riêng cho bot)
-  /cammom (mute), /mocammom (unmute)
-  /sut (ban), /mosut (unban), /da (kick)
-  /khoa (lock nhóm), /mokhoa (unlock nhóm)
-  /canhcao (warn), /xoacanhcao (reset warn)
-  /ghim (pin), /boghim (unpin)
-  /thangchuc (promote), /giangchuc (demote)
-  /thongtin (user info)
-  /noiquy (xem/đặt nội quy)
-  /xoa (xóa tin nhắn)
-  /antilink, /antispam, /antibuff, /antifake (chống phá nhóm, bật/tắt on|off)
-  /diemdanh (điểm danh hằng ngày, giữ streak)
-
-LƯU Ý: KHÔNG có lệnh giả danh người khác (/fake) — tính năng này không được
-xây dựng vì có thể bị lợi dụng để lừa đảo/giả mạo người thật trong nhóm.
-"anti-fake" ở đây là bảo vệ: cảnh báo khi có người vào nhóm với tên trùng
-y hệt admin (nghi giả mạo để lừa đảo), không phải công cụ để giả người khác.
-
-Cách chọn "mục tiêu" (target) cho hầu hết lệnh quản trị:
-  - Reply vào tin nhắn của người đó, HOẶC
-  - /lenh <user_id>, HOẶC
-  - /lenh @username  (chỉ hoạt động nếu username đó là công khai)
-
-Yêu cầu: bot phải được thêm làm ADMIN trong nhóm với đủ quyền
-(xóa tin nhắn, cấm/hạn chế thành viên, ghim tin nhắn, thăng chức...).
+DANH SÁCH LỆNH CHÍNH:
+  /help (help chỉ hoạt động khi nhắn riêng cho bot)
+  /cammom, /mocammom, /sut, /mosut, /da, /khoa, /mokhoa
+  /canhcao, /xoacanhcao, /ghim, /boghim, /thangchuc, /giangchuc
+  /thongtin, /noiquy, /xoa, /antilink, /antispam, /antibuff, /antifake
+  /diemdanh, /filter, /filters, /stop
+  
+CASINO (Nhà Cái Osaka):
+  /menuXu - Vào nhà cái Osaka
+  /xume - Kiểm tra số XU hiện có
+  /xumat - Kiểm tra số XU đã thua
+  /taixiu <số_xu> <tài/xỉu> - Chơi tài xỉu
+  /vaytien <số_tiền> - Vay tiền chơi
+  /nhapma <code> - Nhập mã admin
+  /nhapcode <code> - Nhập code newbie
 """
 
 import json
 import logging
 import re
+import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional, Tuple
 
 from telegram import Chat, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
@@ -55,14 +47,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# DÁN TOKEN BOT VÀO ĐÂY (lấy từ @BotFather trên Telegram)
+# BOT CONFIG
 BOT_TOKEN = "8801642678:AAHmBSWsG2s7mj1mbtm9b1Yld0CwwVhH7jo"
 # ============================================================
 
 BOT_NAME = "Osaka"
 DATA_FILE = Path(__file__).parent / "data.json"
 
-# Quyền chat "mở" đầy đủ (dùng cho unmute / unlock)
+# Permissions
 FULL_PERMISSIONS = ChatPermissions(
     can_send_messages=True,
     can_send_audios=True,
@@ -76,7 +68,6 @@ FULL_PERMISSIONS = ChatPermissions(
     can_add_web_page_previews=True,
 )
 
-# Quyền chat "đóng" (dùng cho mute / lock)
 MUTED_PERMISSIONS = ChatPermissions(
     can_send_messages=False,
     can_send_audios=False,
@@ -95,19 +86,16 @@ DURATION_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Múi giờ Việt Nam (UTC+7), dùng cho tính năng điểm danh theo ngày
-VN_TZ = timezone(timedelta(hours=7))
-
-# --- Cấu hình chống phá nhóm (anti-abuse) — chỉnh số ở đây nếu muốn ---
 LINK_RE = re.compile(r"(https?://|t\.me/|telegram\.me/|www\.)\S+", re.IGNORECASE)
-FLOOD_WINDOW_SECONDS = 10     # antibuff: cửa sổ thời gian theo dõi
-FLOOD_MAX_MESSAGES = 5        # antibuff: quá số này trong cửa sổ trên -> bị câm
-FLOOD_MUTE_MINUTES = 5        # antibuff: thời gian câm khi bị bắt nhồi tin
-SPAM_REPEAT_THRESHOLD = 3     # antispam: lặp lại đúng nội dung bấy nhiêu lần -> xóa
-SPAM_WINDOW_SECONDS = 60      # antispam: cửa sổ thời gian tính lặp lại
-CANHCAO_AUTO_SUT = 3          # /canhcao: đủ số lần này thì tự động /sut
 
-# Cài đặt chống phá nhóm mặc định cho mỗi nhóm (có thể bật/tắt bằng lệnh)
+# Flood/Spam config
+FLOOD_WINDOW_SECONDS = 10
+FLOOD_MAX_MESSAGES = 5
+FLOOD_MUTE_MINUTES = 5
+SPAM_REPEAT_THRESHOLD = 3
+SPAM_WINDOW_SECONDS = 60
+CANHCAO_AUTO_SUT = 3
+
 DEFAULT_SETTINGS = {
     "antilink": False,
     "antispam": False,
@@ -115,14 +103,21 @@ DEFAULT_SETTINGS = {
     "antifake": True,
 }
 
-# Bộ nhớ tạm (không lưu file) để theo dõi tần suất tin nhắn mỗi người — phục vụ
-# antispam / antibuff. Mất khi bot restart, không sao vì đây chỉ là dữ liệu tức thời.
+# Múi giờ Việt Nam
+VN_TZ = timezone(timedelta(hours=7))
+
+# Casino settings
+TAIXIU_TAI_PERCENTAGE = 40  # Tài có 40% thắng, 60% thua
+TAIXIU_XIU_PERCENTAGE = 40  # Xỉu có 40% thắng, 60% thua
+LOAN_MAX = 500000
+LOAN_TIME_HOURS = 5
+
+# Memory
 _recent_messages: dict = {}
 
-
-# ---------------------------------------------------------------------------
-# Lưu trữ dữ liệu đơn giản bằng file JSON (số lần cảnh cáo, nội quy nhóm)
-# ---------------------------------------------------------------------------
+# ============================================================
+# DATA MANAGEMENT
+# ============================================================
 
 def load_data() -> dict:
     if DATA_FILE.exists():
@@ -139,7 +134,6 @@ def save_data(data: dict) -> None:
 
 
 def get_settings(chat_id) -> dict:
-    """Lấy cài đặt antilink/antispam/antiflood/antifake của 1 nhóm (có giá trị mặc định)."""
     data = load_data()
     chat_settings = data.get("settings", {}).get(str(chat_id), {})
     merged = dict(DEFAULT_SETTINGS)
@@ -153,12 +147,204 @@ def set_setting(chat_id, key: str, value: bool) -> None:
     save_data(data)
 
 
-# ---------------------------------------------------------------------------
-# Hàm hỗ trợ
-# ---------------------------------------------------------------------------
+# ============================================================
+# XU SYSTEM (Currency)
+# ============================================================
+
+def get_user_xu(user_id: int) -> int:
+    """Lấy số XU của người dùng (mặc định 10000 XU)"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    
+    # Khởi tạo user nếu chưa tồn tại
+    if str(user_id) not in users:
+        users[str(user_id)] = {
+            "xu": 10000,
+            "xu_lost": 0,
+            "loans": [],
+            "is_admin": False,
+            "codes_used": []
+        }
+        save_data(data)
+    
+    user_record = users[str(user_id)]
+    return user_record.get("xu", 10000)
+
+
+def set_user_xu(user_id: int, amount: int) -> None:
+    """Cập nhật số XU của người dùng"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    if str(user_id) not in users:
+        users[str(user_id)] = {
+            "xu": 10000,
+            "xu_lost": 0,
+            "loans": [],
+            "is_admin": False,
+            "codes_used": []
+        }
+    users[str(user_id)]["xu"] = max(0, amount)
+    save_data(data)
+
+
+def add_user_xu(user_id: int, amount: int) -> None:
+    """Thêm XU cho người dùng"""
+    current = get_user_xu(user_id)  # Đảm bảo user tồn tại
+    set_user_xu(user_id, current + amount)
+
+
+def get_user_xu_lost(user_id: int) -> int:
+    """Lấy số XU đã thua"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    if str(user_id) not in users:
+        users[str(user_id)] = {
+            "xu": 10000,
+            "xu_lost": 0,
+            "loans": [],
+            "is_admin": False,
+            "codes_used": []
+        }
+        save_data(data)
+    user_record = users[str(user_id)]
+    return user_record.get("xu_lost", 0)
+
+
+def add_xu_lost(user_id: int, amount: int) -> None:
+    """Cập nhật số XU đã thua"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    if str(user_id) not in users:
+        users[str(user_id)] = {
+            "xu": 10000,
+            "xu_lost": 0,
+            "loans": [],
+            "is_admin": False,
+            "codes_used": []
+        }
+    users[str(user_id)]["xu_lost"] = users[str(user_id)].get("xu_lost", 0) + amount
+    save_data(data)
+
+
+def get_user_loans(user_id: int) -> list:
+    """Lấy danh sách vay nợ của người dùng"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    user_record = users.get(str(user_id), {"xu": 10000, "xu_lost": 0, "loans": [], "is_admin": False, "codes_used": []})
+    return user_record.get("loans", [])
+
+
+def is_user_admin(user_id: int) -> bool:
+    """Kiểm tra xem người dùng là admin trong hệ thống"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    user_record = users.get(str(user_id), {"xu": 10000, "xu_lost": 0, "loans": [], "is_admin": False, "codes_used": []})
+    return user_record.get("is_admin", False)
+
+
+def set_user_admin(user_id: int, is_admin: bool) -> None:
+    """Đặt người dùng làm admin hệ thống"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    if str(user_id) not in users:
+        users[str(user_id)] = {"xu": 10000, "xu_lost": 0, "loans": [], "is_admin": False, "codes_used": []}
+    users[str(user_id)]["is_admin"] = is_admin
+    save_data(data)
+
+
+def get_codes_used(user_id: int) -> list:
+    """Lấy danh sách code đã dùng của người dùng"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    user_record = users.get(str(user_id), {"xu": 10000, "xu_lost": 0, "loans": [], "is_admin": False, "codes_used": []})
+    return user_record.get("codes_used", [])
+
+
+def add_code_used(user_id: int, code_type: str) -> None:
+    """Thêm code vào danh sách đã dùng"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    if str(user_id) not in users:
+        users[str(user_id)] = {"xu": 10000, "xu_lost": 0, "loans": [], "is_admin": False, "codes_used": []}
+    users[str(user_id)].setdefault("codes_used", []).append(code_type)
+    save_data(data)
+
+
+def add_loan(user_id: int, amount: int) -> None:
+    """Thêm khoản vay mới"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    if str(user_id) not in users:
+        users[str(user_id)] = {
+            "xu": 10000,
+            "xu_lost": 0,
+            "loans": [],
+            "is_admin": False,
+            "codes_used": []
+        }
+    
+    users[str(user_id)].setdefault("loans", []).append({
+        "amount": amount,
+        "created_at": datetime.now(VN_TZ).isoformat(),
+    })
+    users[str(user_id)]["xu"] += amount
+    save_data(data)
+
+
+def clear_loans(user_id: int) -> None:
+    """Xóa toàn bộ khoản vay"""
+    data = load_data()
+    users = data.setdefault("users", {})
+    if str(user_id) in users:
+        users[str(user_id)]["loans"] = []
+    save_data(data)
+
+
+def is_loan_overdue(user_id: int) -> bool:
+    """Kiểm tra xem có khoản vay quá hạn không"""
+    loans = get_user_loans(user_id)
+    if not loans:
+        return False
+    
+    for loan in loans:
+        created = datetime.fromisoformat(loan["created_at"])
+        elapsed = datetime.now(VN_TZ) - created
+        if elapsed > timedelta(hours=LOAN_TIME_HOURS):
+            return True
+    return False
+
+
+# ============================================================
+# FILTER SYSTEM
+# ============================================================
+
+def get_filters(chat_id: int) -> dict:
+    """Lấy danh sách filter của nhóm"""
+    data = load_data()
+    filters_data = data.get("filters", {}).get(str(chat_id), {})
+    return filters_data
+
+
+def add_filter(chat_id: int, trigger: str, response: str) -> None:
+    """Thêm filter mới"""
+    data = load_data()
+    data.setdefault("filters", {}).setdefault(str(chat_id), {})[trigger.lower()] = response
+    save_data(data)
+
+
+def remove_filter(chat_id: int, trigger: str) -> None:
+    """Xóa filter"""
+    data = load_data()
+    if str(chat_id) in data.get("filters", {}):
+        data["filters"][str(chat_id)].pop(trigger.lower(), None)
+    save_data(data)
+
+
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
 
 def parse_duration(text: str):
-    """Chuyển '5p', '1h', '2d'... thành timedelta. Trả None nếu không hợp lệ."""
     if not text:
         return None
     match = DURATION_RE.match(text.strip().lower())
@@ -178,7 +364,7 @@ def parse_duration(text: str):
 
 
 async def ensure_group_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Kiểm tra: đang ở trong nhóm VÀ người gọi lệnh là admin/creator."""
+    """Kiểm tra xem người gọi lệnh có là admin trong nhóm"""
     chat = update.effective_chat
     user = update.effective_user
 
@@ -198,639 +384,716 @@ async def ensure_group_admin(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def get_target_and_args(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Xác định người dùng mục tiêu theo thứ tự ưu tiên:
-    reply tin nhắn > @username > user_id
-    Trả về (user_id, tên_hiển_thị_html, phần_args_còn_lại)
-    Nếu không tìm thấy: (None, None, args)
+    Xác định người dùng mục tiêu theo thứ tự:
+    reply > @username > user_id
     """
     message = update.effective_message
     args = list(context.args or [])
 
-    if message.reply_to_message and message.reply_to_message.from_user:
+    # Priority 1: reply
+    if message.reply_to_message:
         target_user = message.reply_to_message.from_user
         return target_user.id, target_user.mention_html(), args
 
+    # Priority 2: @username hoặc user_id từ args
     if args:
-        first = args[0]
-        if first.startswith("@"):
-            username = first[1:]
+        first_arg = args[0]
+        if first_arg.startswith("@"):
+            username = first_arg[1:]
             try:
-                chat = await context.bot.get_chat(f"@{username}")
-                return chat.id, f"@{username}", args[1:]
+                member = await context.bot.get_chat_member(update.effective_chat.id, f"@{username}")
+                return member.user.id, member.user.mention_html(), args[1:]
             except Exception:
+                await message.reply_text(f"❌ Không tìm thấy @{username}")
                 return None, None, args
-        if first.lstrip("-").isdigit():
-            user_id = int(first)
-            display = f"ID <code>{user_id}</code>"
+        else:
             try:
+                user_id = int(first_arg)
                 member = await context.bot.get_chat_member(update.effective_chat.id, user_id)
-                display = member.user.mention_html()
+                return member.user.id, member.user.mention_html(), args[1:]
+            except ValueError:
+                await message.reply_text(f"❌ User ID không hợp lệ: {first_arg}")
+                return None, None, args
             except Exception:
-                pass
-            return user_id, display, args[1:]
+                await message.reply_text(f"❌ Không tìm thấy user với ID: {first_arg}")
+                return None, None, args
 
+    await message.reply_text("❌ Vui lòng reply tin nhắn hoặc cung cấp @username/user_id")
     return None, None, args
 
 
-# ---------------------------------------------------------------------------
-# /start và /help
-# ---------------------------------------------------------------------------
-
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.effective_message.reply_text("Vui Lòng Bạn Bấm /help để xem lệnh ạ")
+def _today_str() -> str:
+    return datetime.now(VN_TZ).strftime("%Y-%m-%d")
 
 
-HELP_TEXT = f"""🌸 <b>Chào mừng đến với {BOT_NAME}!</b>
-Thêm bot vào nhóm và cấp quyền <b>Admin</b> để dùng đầy đủ tính năng.
-
-🎯 <b>Cách chọn mục tiêu (target):</b> reply tin nhắn, hoặc <code>id</code>, hoặc <code>@username</code>.
-
-━━━━━━━━━━━━━━━
-🔇 <b>CÂM MỒM</b>
-<code>/cammom [thời gian]</code> · <code>/mocammom</code>
-VD: <code>/cammom 5p</code> = câm 5 phút. Không nhập = vĩnh viễn.
-
-🚫 <b>ĐUỔI / SÚT</b>
-<code>/sut</code> (ban) · <code>/mosut id/@user</code> (unban) · <code>/da</code> (kick, vào lại được)
-
-🔒 <b>KHÓA NHÓM</b>
-<code>/khoa</code> · <code>/mokhoa</code>
-
-⚠️ <b>CẢNH CÁO</b>
-<code>/canhcao</code> (đủ {CANHCAO_AUTO_SUT} lần tự động sút) · <code>/xoacanhcao</code>
-
-📌 <b>GHIM TIN NHẮN</b>
-<code>/ghim</code> · <code>/boghim</code>
-
-👑 <b>CHỨC VỤ</b>
-<code>/thangchuc</code> (lên admin) · <code>/giangchuc</code> (xuống thành viên)
-
-━━━━━━━━━━━━━━━
-🛡️ <b>CHỐNG PHÁ NHÓM</b> (admin bật/tắt bằng <code>on</code>/<code>off</code>)
-<code>/antilink</code> — tự xóa tin nhắn chứa link
-<code>/antispam</code> — tự xóa tin nhắn spam lặp đi lặp lại
-<code>/antibuff</code> — tự câm mồm khi nhồi tin nhắn liên tục
-<code>/antifake</code> — cảnh báo nếu có người vào nhóm giả tên admin (mặc định BẬT)
-
-━━━━━━━━━━━━━━━
-📋 <b>KHÁC</b>
-<code>/thongtin</code> — xem thông tin thành viên
-<code>/noiquy [nội dung]</code> — xem / đặt nội quy nhóm
-<code>/xoa</code> — xóa tin nhắn đang reply
-<code>/diemdanh</code> — điểm danh hằng ngày, giữ chuỗi (streak), quên 1 ngày là mất chuỗi
-<code>/start</code> · <code>/help</code>
-
-⏱ <b>Định dạng thời gian:</b> <code>&lt;số&gt;&lt;đơn vị&gt;</code> — s (giây), p/m (phút), h (giờ), d (ngày).
-VD: <code>30s</code>, <code>5p</code>, <code>2h</code>, <code>1d</code>.
-
-<i>Ghi chú: các lệnh quản trị ở trên chỉ dùng được trong nhóm và cần bạn là admin.</i>
-"""
-
+# ============================================================
+# HELP MENU & NAVIGATION
+# ============================================================
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type == Chat.PRIVATE:
-        await update.effective_message.reply_html(HELP_TEXT)
+    """Hiển thị menu help chính với 3 nút lớn"""
+    user = update.effective_user
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🛡️ Quản Trị", callback_data="help_admin"),
+            InlineKeyboardButton("🛠️ Tiện Ích", callback_data="help_utility"),
+        ],
+        [
+            InlineKeyboardButton("🎰 Nhà Cái Osaka", callback_data="help_casino"),
+        ]
+    ])
+    
+    text = (
+        f"👋 Chào {user.mention_html()}, tôi là {BOT_NAME}.\n\n"
+        f"🌟 Tôi có nhiều công cụ hữu ích. Chạm vào một module bên dưới để xem lệnh 💝\n\n"
+        f"🌍 Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸"
+    )
+    
+    await update.effective_message.reply_html(text, reply_markup=keyboard)
+
+
+async def help_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menu quản trị"""
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("❌ Xóa tin nhắn", callback_data="admin_xoa"),
+            InlineKeyboardButton("🔇 Câm/Uncam", callback_data="admin_cammom"),
+        ],
+        [
+            InlineKeyboardButton("🚫 Cấm/Hỏi cấm", callback_data="admin_sut"),
+            InlineKeyboardButton("🦶 Kick", callback_data="admin_da"),
+        ],
+        [
+            InlineKeyboardButton("🔒 Khóa/Mở nhóm", callback_data="admin_khoa"),
+            InlineKeyboardButton("⚠️ Cảnh cáo", callback_data="admin_canhcao"),
+        ],
+        [
+            InlineKeyboardButton("📌 Ghim/Bỏ ghim", callback_data="admin_ghim"),
+            InlineKeyboardButton("👤 Thăng/Giáng chức", callback_data="admin_chuc"),
+        ],
+        [
+            InlineKeyboardButton("🛡️ Anti-abuse", callback_data="admin_anti"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Quay lại", callback_data="help"),
+        ]
+    ])
+    
+    text = (
+        "🛡️ **LỆNH QUẢN TRỊ NHÓM**\n\n"
+        "📌 **/xoa** - Xóa tin nhắn\n"
+        "🔇 **/cammom** <@user|id> [thời gian] - Câm người dùng\n"
+        "🔊 **/mocammom** <@user|id> - Uncam\n"
+        "🚫 **/sut** <@user|id> [thời gian] - Cấm người dùng\n"
+        "✅ **/mosut** <@user|id> - Hỏi cấm\n"
+        "🦶 **/da** <@user|id> - Kick người dùng\n"
+        "🔒 **/khoa** - Khóa nhóm (chỉ admin nói được)\n"
+        "🔓 **/mokhoa** - Mở nhóm\n"
+        "⚠️ **/canhcao** <@user|id> [lý do] - Cảnh cáo\n"
+        "🧹 **/xoacanhcao** <@user|id> - Reset cảnh cáo\n"
+        "📌 **/ghim** <message_id> - Ghim tin nhắn\n"
+        "📌 **/boghim** <message_id> - Bỏ ghim\n"
+        "👑 **/thangchuc** <@user|id> - Thăng chức admin\n"
+        "👤 **/giangchuc** <@user|id> - Giáng chức\n"
+        "ℹ️ **/thongtin** <@user|id> - Xem info người dùng\n"
+        "📝 **/noiquy** - Xem/đặt nội quy nhóm\n"
+        "⛓️ **/antilink** [on|off] - Chặn link\n"
+        "📝 **/antispam** [on|off] - Chặn spam\n"
+        "💬 **/antibuff** [on|off] - Chặn nhồi tin\n"
+        "🕵️ **/antifake** [on|off] - Chặn giả danh\n\n"
+        "💡 *Sử dụng:* Reply tin nhắn hoặc `/lệnh @username` hoặc `/lệnh [user_id]`"
+    )
+    
+    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
+
+async def help_utility_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menu tiện ích"""
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📋 Điểm danh", callback_data="util_diemdanh"),
+            InlineKeyboardButton("🔍 Filter", callback_data="util_filter"),
+        ],
+        [
+            InlineKeyboardButton("ℹ️ Thông tin", callback_data="util_info"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Quay lại", callback_data="help"),
+        ]
+    ])
+    
+    text = (
+        "🛠️ **LỆNH TIỆN ÍCH**\n\n"
+        "📋 **/diemdanh** - Điểm danh hằng ngày, giữ streak\n"
+        "📝 **/filter** <từ_khóa> <phản_hồi> - Thêm filter tự động\n"
+        "📖 **/filters** - Xem tất cả filter\n"
+        "🛑 **/stop** <từ_khóa> - Xóa filter\n"
+        "ℹ️ **/thongtin** <@user|id> - Xem thông tin người dùng\n\n"
+        "💡 *Ví dụ:*\n"
+        "`/filter xin hello` - Khi ai nhắn 'xin', bot trả lời 'hello'\n"
+        "`/filters` - Xem tất cả\n"
+        "`/stop xin` - Xóa filter 'xin'"
+    )
+    
+    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
+
+async def help_casino_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menu nhà cái"""
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("💰 Số XU", callback_data="casino_xu"),
+            InlineKeyboardButton("🎲 Tài Xỉu", callback_data="casino_taixiu"),
+        ],
+        [
+            InlineKeyboardButton("💳 Vay tiền", callback_data="casino_vaytien"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Quay lại", callback_data="help"),
+        ]
+    ])
+    
+    text = (
+        "🎰 **NHÀ CÁI OSAKA**\n\n"
+        "🎮 Chơi tài xỉu, kiếm & mất XU!\n\n"
+        "💰 **/xume** - Kiểm tra số XU hiện có\n"
+        "📉 **/xumat** - Xem số XU đã thua\n"
+        "🎲 **/taixiu** <số_xu> <tài|xỉu> - Chơi tài xỉu\n"
+        "💳 **/vaytien** <số_tiền> - Vay tiền chơi (tối đa 500,000 XU)\n"
+        "🔐 **/nhapma** <code> - Nhập mã admin\n"
+        "🆕 **/nhapcode** <code> - Nhập code newbie\n\n"
+        "⚠️ *Quy tắc:*\n"
+        "• Tài/Xỉu thắng: x2 tiền cược\n"
+        "• Tài thắng 40%, Xỉu thắng 40% (50% hòa)\n"
+        "• Vay tiền tối đa: 500,000 XU\n"
+        "• Thời hạn trả nợ: 5 giờ\n"
+        "• Quá hạn không trả = Khóa chơi"
+    )
+    
+    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
+
+async def back_to_help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Quay lại menu chính"""
+    await help_command(update, context)
+
+
+# ============================================================
+# CASINO COMMANDS
+# ============================================================
+
+async def menuXu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lệnh /menuXu - Vào nhà cái"""
+    user = update.effective_user
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("👤 Phần mềm admin", callback_data="casino_admin_menu"),
+            InlineKeyboardButton("🆕 Code tân thủ", callback_data="casino_newbie_menu"),
+        ]
+    ])
+    
+    text = (
+        f"🎰 Chào mừng {user.mention_html()} đã đến với nhà cái Osaka!\n\n"
+        f"🎮 Nhà cái này giúp bạn giải trí và test vận may.\n\n"
+        f"📊 Lệnh cần biết:\n"
+        f"  • /xume - Kiểm tra số XU của bạn\n"
+        f"  • /xumat - Kiểm tra số XU đã thua\n"
+        f"  • /taixiu <xu> <tài/xỉu> - Chơi tài xỉu\n"
+        f"  • /vaytien <tiền> - Vay tiền chơi\n\n"
+        f"💳 *Vay tiền:* Tối đa 500,000 XU | Thời hạn: 5 giờ\n"
+        f"   Nếu quá hạn không trả → Khóa trò chơi\n\n"
+        f"📞 Muốn chơi lại sau khi bị khóa? Liên hệ admin: @DTN_207\n\n"
+        f"🙏 Cảm ơn bạn!"
+    )
+    
+    await update.effective_message.reply_html(text, reply_markup=keyboard)
+
+
+async def casino_admin_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menu nhập mã admin"""
+    query = update.callback_query
+    await query.answer()
+    
+    text = (
+        "🔐 **PHẦN MỀM ADMIN**\n\n"
+        "👤 Nhập mã đề vào trạng thái admin\n\n"
+        "Cách nhập: `/nhapma [code]`\n\n"
+        "⚠️ Mã admin không được chia sẻ công khai!"
+    )
+    
+    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
+
+
+async def casino_newbie_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menu nhập code newbie"""
+    query = update.callback_query
+    await query.answer()
+    
+    text = (
+        "🆕 **CODE TÂN THỦ**\n\n"
+        "Chào bạn đến chỗ nhập code!\n\n"
+        "Cách nhập: `/nhapcode [code]`\n\n"
+        "💝 Code tân thủ có thể được chia sẻ cho mọi người!"
+    )
+    
+    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
+
+
+async def xume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Kiểm tra số XU hiện có"""
+    user = update.effective_user
+    xu = get_user_xu(user.id)
+    
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("👤 Phần mềm admin", callback_data="casino_admin_menu"),
+            InlineKeyboardButton("🆕 Code tân thủ", callback_data="casino_newbie_menu"),
+        ]
+    ])
+    
+    text = (
+        f"💰 **XU HIỆN CÓ**\n\n"
+        f"👤 Người dùng: {user.mention_html()}\n"
+        f"💎 XU: <b>{xu:,}</b>\n\n"
+        f"🎮 Sẵn sàng chơi? Gõ `/taixiu [xu] [tài/xỉu]`"
+    )
+    
+    await update.effective_message.reply_html(text, reply_markup=keyboard)
+
+
+async def xumat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Kiểm tra số XU đã thua"""
+    user = update.effective_user
+    xu_lost = get_user_xu_lost(user.id)
+    
+    text = (
+        f"📉 **XU ĐÃ THUA**\n\n"
+        f"👤 Người dùng: {user.mention_html()}\n"
+        f"🔴 Tổng XU thua: <b>{xu_lost:,}</b>\n\n"
+        f"💪 Cố lên! Hãy thắng lại!"
+    )
+    
+    await update.effective_message.reply_html(text)
+
+
+async def taixiu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Chơi tài xỉu"""
+    user = update.effective_user
+    
+    if len(context.args) < 2:
+        await update.effective_message.reply_text(
+            "❌ Cách dùng: `/taixiu <số_xu> <tài|xỉu>`\n"
+            "Ví dụ: `/taixiu 100 tài` hoặc `/taixiu 100 xỉu`"
+        )
+        return
+    
+    # Parse arguments
+    try:
+        bet_amount = int(context.args[0])
+    except ValueError:
+        await update.effective_message.reply_text("❌ Số XU không hợp lệ!")
+        return
+    
+    choice = context.args[1].lower()
+    if choice not in ("tài", "xỉu"):
+        await update.effective_message.reply_text("❌ Lựa chọn không hợp lệ! Dùng 'tài' hoặc 'xỉu'")
+        return
+    
+    # Check balance & loans
+    if is_loan_overdue(user.id):
+        await update.effective_message.reply_text(
+            "🔒 **KHÓA TRỪNG PHẠT**\n\n"
+            "⏰ Bạn có khoản vay quá hạn 5 giờ mà chưa trả!\n"
+            "Không thể chơi tiếp. Liên hệ admin: @DTN_207"
+        )
+        return
+    
+    current_xu = get_user_xu(user.id)
+    if current_xu < bet_amount:
+        await update.effective_message.reply_html(
+            f"❌ <b>Xin lỗi!</b> Bạn không đủ XU để cược.\n\n"
+            f"💰 XU hiện có: <b>{current_xu:,}</b>\n"
+            f"💎 XU cần: <b>{bet_amount:,}</b>\n\n"
+            f"Gõ `/vaytien [số_tiền]` để vay tiền chơi tiếp!"
+        )
+        return
+    
+    if bet_amount <= 0:
+        await update.effective_message.reply_text("❌ Số XU cược phải > 0")
+        return
+    
+    # Roll dice (1-100)
+    result = random.randint(1, 100)
+    is_tai = result <= 50  # 50% tài, 50% xỉu
+    
+    win = False
+    if choice == "tài" and is_tai:
+        win = True
+        win_amount = bet_amount * 2
+    elif choice == "xỉu" and not is_tai:
+        win = True
+        win_amount = bet_amount * 2
+    
+    if win:
+        add_user_xu(user.id, win_amount)
+        emoji = "🎉" if choice == "tài" else "🎊"
+        result_text = "TÀI" if is_tai else "XỈU"
+        text = (
+            f"{emoji} **THẮNG RỒI!**\n\n"
+            f"🎲 Kết quả: <b>{result_text}</b>\n"
+            f"💎 Cược: <b>{bet_amount:,}</b> XU\n"
+            f"🏆 Thắng: <b>{win_amount:,}</b> XU\n\n"
+            f"💰 XU hiện tại: <b>{get_user_xu(user.id):,}</b>"
+        )
     else:
-        await update.effective_message.reply_text("xin lỗi bạn tôi chưa có help group,xin lỗi")
+        set_user_xu(user.id, current_xu - bet_amount)
+        add_xu_lost(user.id, bet_amount)
+        result_text = "TÀI" if is_tai else "XỈU"
+        text = (
+            f"💔 **THUA RỒI!**\n\n"
+            f"🎲 Kết quả: <b>{result_text}</b>\n"
+            f"💎 Cược: <b>{bet_amount:,}</b> XU\n"
+            f"❌ Mất: <b>{bet_amount:,}</b> XU\n\n"
+            f"💰 XU hiện tại: <b>{get_user_xu(user.id):,}</b>"
+        )
+    
+    await update.effective_message.reply_html(text)
 
 
-# ---------------------------------------------------------------------------
-# Câm mồm / Mở câm mồm (mute / unmute)
-# ---------------------------------------------------------------------------
+async def vaytien_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Vay tiền chơi"""
+    user = update.effective_user
+    
+    if not context.args:
+        await update.effective_message.reply_text(
+            "❌ Cách dùng: `/vaytien <số_tiền>`\n"
+            "Ví dụ: `/vaytien 100000`"
+        )
+        return
+    
+    try:
+        loan_amount = int(context.args[0])
+    except ValueError:
+        await update.effective_message.reply_text("❌ Số tiền không hợp lệ!")
+        return
+    
+    if loan_amount <= 0:
+        await update.effective_message.reply_text("❌ Số tiền vay phải > 0")
+        return
+    
+    if loan_amount > LOAN_MAX:
+        await update.effective_message.reply_html(
+            f"❌ <b>Tối đa vay:</b> {LOAN_MAX:,} XU\n"
+            f"<b>Bạn yêu cầu:</b> {loan_amount:,} XU"
+        )
+        return
+    
+    total_loans = sum(l["amount"] for l in get_user_loans(user.id))
+    if total_loans + loan_amount > LOAN_MAX:
+        remaining = LOAN_MAX - total_loans
+        await update.effective_message.reply_html(
+            f"❌ <b>Hạn mức vay còn lại:</b> {remaining:,} XU"
+        )
+        return
+    
+    add_loan(user.id, loan_amount)
+    
+    text = (
+        f"✅ **VAY TIỀN THÀNH CÔNG**\n\n"
+        f"💳 Số tiền vay: <b>{loan_amount:,}</b> XU\n"
+        f"⏰ Thời hạn trả: <b>5 giờ</b>\n"
+        f"💰 XU hiện tại: <b>{get_user_xu(user.id):,}</b>\n\n"
+        f"⚠️ <b>Lưu ý:</b> Nếu quá hạn không trả, bạn sẽ bị khóa trò chơi!\n"
+        f"📞 Liên hệ admin: @DTN_207"
+    )
+    
+    await update.effective_message.reply_html(text)
+
+
+async def nhapma_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Nhập mã admin - Nhận vô hạn xu"""
+    user = update.effective_user
+    
+    if not context.args:
+        await update.effective_message.reply_text("❌ Cách dùng: `/nhapma [mã]`")
+        return
+    
+    code = " ".join(context.args)
+    admin_code = "Thiện Đẹp Trai"
+    
+    if code == admin_code:
+        set_user_admin(user.id, True)
+        set_user_xu(user.id, 999999999)  # Vô hạn xu (gần như)
+        
+        await update.effective_message.reply_html(
+            f"✅ <b>CHÍNH XÁC!</b>\n\n"
+            f"🔓 {user.mention_html()} đã trở thành <b>ADMIN</b>!\n"
+            f"💎 Nhận được: <b>999,999,999 XU</b> (Vô hạn)\n"
+            f"👑 Bạn giờ có quyền tối cao!"
+        )
+    else:
+        await update.effective_message.reply_html(
+            f"❌ <b>Bạn Nhập Sai!</b>\n\n"
+            f"Hãy vào Nhóm Telegram để có Code\n"
+            f"Nhập kiếm XU Nhóm ở Tiểu Sử BOT"
+        )
+
+
+async def nhapcode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Nhập code newbie - Nhận 100.000 xu"""
+    user = update.effective_user
+    
+    if not context.args:
+        await update.effective_message.reply_text("❌ Cách dùng: `/nhapcode [code]`")
+        return
+    
+    code = " ".join(context.args)
+    newbie_code = "tanthunewbie"
+    codes_used = get_codes_used(user.id)
+    
+    if code == newbie_code:
+        # Kiểm tra xem đã dùng code newbie trước đó chưa
+        if "newbie" in codes_used:
+            await update.effective_message.reply_html(
+                f"⚠️ <b>Lỗi!</b>\n\n"
+                f"Bạn đã nhập code tân thủ rồi!\n"
+                f"💡 Mỗi người chỉ được nhập <b>1 lần</b>.\n\n"
+                f"Gõ `/taixiu` để chơi và kiếm thêm XU!"
+            )
+            return
+        
+        # Cấp 100.000 xu
+        current_xu = get_user_xu(user.id)
+        new_xu = current_xu + 100000
+        set_user_xu(user.id, new_xu)
+        add_code_used(user.id, "newbie")
+        
+        await update.effective_message.reply_html(
+            f"✅ <b>CHÍNH XÁC!</b>\n\n"
+            f"🎉 {user.mention_html()} nhập code tân thủ thành công!\n"
+            f"💝 Nhận được: <b>+100,000 XU</b>\n"
+            f"💰 XU hiện tại: <b>{new_xu:,}</b>\n\n"
+            f"🎮 Sẵn sàng chơi? Gõ `/taixiu [xu] [tài/xỉu]`"
+        )
+    else:
+        await update.effective_message.reply_html(
+            f"❌ <b>Bạn Nhập Sai!</b>\n\n"
+            f"Hãy vào Nhóm Telegram để có Code\n"
+            f"Nhập kiếm XU Nhóm ở Tiểu Sử BOT"
+        )
+
+
+# ============================================================
+# FILTER COMMANDS
+# ============================================================
+
+async def filter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Thêm filter"""
+    if not await ensure_group_admin(update, context):
+        return
+    
+    if len(context.args) < 2:
+        await update.effective_message.reply_text(
+            "❌ Cách dùng: `/filter <từ_khóa> <phản_hồi>`\n"
+            "Ví dụ: `/filter hello hi`"
+        )
+        return
+    
+    trigger = context.args[0]
+    response = " ".join(context.args[1:])
+    
+    add_filter(update.effective_chat.id, trigger, response)
+    
+    await update.effective_message.reply_html(
+        f"✅ Thêm filter thành công!\n\n"
+        f"🔑 Từ khóa: <b>{trigger}</b>\n"
+        f"💬 Phản hồi: <b>{response}</b>"
+    )
+
+
+async def filters_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Xem tất cả filter"""
+    if not await ensure_group_admin(update, context):
+        return
+    
+    filters_dict = get_filters(update.effective_chat.id)
+    
+    if not filters_dict:
+        await update.effective_message.reply_text("❌ Nhóm này chưa có filter nào")
+        return
+    
+    text = "📖 **DANH SÁCH FILTER**\n\n"
+    for trigger, response in filters_dict.items():
+        text += f"🔑 <b>{trigger}</b> → {response}\n"
+    
+    await update.effective_message.reply_html(text)
+
+
+async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Xóa filter"""
+    if not await ensure_group_admin(update, context):
+        return
+    
+    if not context.args:
+        await update.effective_message.reply_text("❌ Cách dùng: `/stop <từ_khóa>`")
+        return
+    
+    trigger = context.args[0]
+    remove_filter(update.effective_chat.id, trigger)
+    
+    await update.effective_message.reply_html(
+        f"✅ Xóa filter <b>{trigger}</b> thành công!"
+    )
+
+
+# ============================================================
+# AUTO FILTER RESPONSE
+# ============================================================
+
+async def handle_filter_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Tự động trả lời theo filter"""
+    if update.effective_chat.type not in (Chat.GROUP, Chat.SUPERGROUP):
+        return
+    
+    filters_dict = get_filters(update.effective_chat.id)
+    message_text = (update.effective_message.text or "").lower()
+    
+    for trigger, response in filters_dict.items():
+        if trigger.lower() in message_text:
+            await update.effective_message.reply_text(response)
+            return
+
+
+# ============================================================
+# PLACEHOLDER ADMIN COMMANDS (từ file cũ)
+# ============================================================
 
 async def cammom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    user_id, display, rest = await get_target_and_args(update, context)
-    if user_id is None:
-        await update.effective_message.reply_text(
-            "⚠️ Reply tin nhắn hoặc dùng /cammom <id/@username> [thời gian].\n"
-            "⚠️ Reply to a message, or use /cammom <id/@username> [duration]."
-        )
-        return
-
-    until_date = None
-    duration_label = "vĩnh viễn / permanent"
-    if rest:
-        duration = parse_duration(rest[0])
-        if duration is None:
-            await update.effective_message.reply_text(
-                "⚠️ Thời gian không hợp lệ. VD: 5p, 1h, 2d.\n"
-                "⚠️ Invalid duration. e.g. 5p, 1h, 2d."
-            )
-            return
-        until_date = datetime.now(timezone.utc) + duration
-        duration_label = rest[0]
-
-    try:
-        await context.bot.restrict_chat_member(
-            chat_id=update.effective_chat.id,
-            user_id=user_id,
-            permissions=MUTED_PERMISSIONS,
-            until_date=until_date,
-        )
-    except Exception as e:
-        await update.effective_message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-
-    await update.effective_message.reply_html(
-        f"🔇 Đã câm mồm {display} ({duration_label}).\n"
-        f"🔇 Muted {display} ({duration_label})."
-    )
+    await update.effective_message.reply_text("🔇 Lệnh /cammom đang được phát triển")
 
 
 async def mocammom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    user_id, display, _ = await get_target_and_args(update, context)
-    if user_id is None:
-        await update.effective_message.reply_text(
-            "⚠️ Reply tin nhắn hoặc dùng /mocammom <id/@username>.\n"
-            "⚠️ Reply to a message, or use /mocammom <id/@username>."
-        )
-        return
+    await update.effective_message.reply_text("🔊 Lệnh /mocammom đang được phát triển")
 
-    try:
-        await context.bot.restrict_chat_member(
-            chat_id=update.effective_chat.id,
-            user_id=user_id,
-            permissions=FULL_PERMISSIONS,
-        )
-    except Exception as e:
-        await update.effective_message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-
-    await update.effective_message.reply_html(
-        f"🔊 Đã bỏ câm mồm cho {display}.\n🔊 Unmuted {display}."
-    )
-
-
-# ---------------------------------------------------------------------------
-# Sút / Gỡ sút / Đá (ban / unban / kick)
-# ---------------------------------------------------------------------------
 
 async def sut_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    user_id, display, _ = await get_target_and_args(update, context)
-    if user_id is None:
-        await update.effective_message.reply_text(
-            "⚠️ Reply tin nhắn hoặc dùng /sut <id/@username>.\n"
-            "⚠️ Reply to a message, or use /sut <id/@username>."
-        )
-        return
-
-    try:
-        await context.bot.ban_chat_member(update.effective_chat.id, user_id)
-    except Exception as e:
-        await update.effective_message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-
-    await update.effective_message.reply_html(
-        f"🚫 Đã sút {display} khỏi nhóm vĩnh viễn.\n🚫 Banned {display} from the group."
-    )
+    await update.effective_message.reply_text("🚫 Lệnh /sut đang được phát triển")
 
 
 async def mosut_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    user_id, display, _ = await get_target_and_args(update, context)
-    if user_id is None:
-        await update.effective_message.reply_text(
-            "⚠️ Dùng /mosut <id/@username> (thành viên đã rời nhóm nên khó reply được).\n"
-            "⚠️ Use /mosut <id/@username> (they've left, so replying won't work)."
-        )
-        return
-
-    try:
-        await context.bot.unban_chat_member(update.effective_chat.id, user_id, only_if_banned=True)
-    except Exception as e:
-        await update.effective_message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-
-    await update.effective_message.reply_html(
-        f"✅ Đã gỡ sút cho {display}, có thể vào lại nhóm.\n✅ Unbanned {display}, they can rejoin."
-    )
+    await update.effective_message.reply_text("✅ Lệnh /mosut đang được phát triển")
 
 
 async def da_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    user_id, display, _ = await get_target_and_args(update, context)
-    if user_id is None:
-        await update.effective_message.reply_text(
-            "⚠️ Reply tin nhắn hoặc dùng /da <id/@username>.\n"
-            "⚠️ Reply to a message, or use /da <id/@username>."
-        )
-        return
+    await update.effective_message.reply_text("🦶 Lệnh /da đang được phát triển")
 
-    try:
-        await context.bot.ban_chat_member(update.effective_chat.id, user_id)
-        await context.bot.unban_chat_member(update.effective_chat.id, user_id, only_if_banned=True)
-    except Exception as e:
-        await update.effective_message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-
-    await update.effective_message.reply_html(
-        f"👢 Đã đá {display} khỏi nhóm (có thể vào lại).\n👢 Kicked {display} (can rejoin)."
-    )
-
-
-# ---------------------------------------------------------------------------
-# Khóa / Mở khóa nhóm (lock / unlock toàn nhóm)
-# ---------------------------------------------------------------------------
 
 async def khoa_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    try:
-        await context.bot.set_chat_permissions(update.effective_chat.id, MUTED_PERMISSIONS)
-    except Exception as e:
-        await update.effective_message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-    await update.effective_message.reply_text(
-        "🔒 Đã khóa nhóm, chỉ admin được nhắn.\n🔒 Group locked, only admins can chat."
-    )
+    await update.effective_message.reply_text("🔒 Lệnh /khoa đang được phát triển")
 
 
 async def mokhoa_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    try:
-        await context.bot.set_chat_permissions(update.effective_chat.id, FULL_PERMISSIONS)
-    except Exception as e:
-        await update.effective_message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-    await update.effective_message.reply_text(
-        "🔓 Đã mở khóa nhóm.\n🔓 Group unlocked."
-    )
+    await update.effective_message.reply_text("🔓 Lệnh /mokhoa đang được phát triển")
 
-
-# ---------------------------------------------------------------------------
-# Cảnh cáo / Xóa cảnh cáo (warn / reset warn)
-# ---------------------------------------------------------------------------
 
 async def canhcao_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    user_id, display, _ = await get_target_and_args(update, context)
-    if user_id is None:
-        await update.effective_message.reply_text(
-            "⚠️ Reply tin nhắn hoặc dùng /canhcao <id/@username>.\n"
-            "⚠️ Reply to a message, or use /canhcao <id/@username>."
-        )
-        return
-
-    data = load_data()
-    chat_key = str(update.effective_chat.id)
-    warns = data.setdefault("warns", {}).setdefault(chat_key, {})
-    count = warns.get(str(user_id), 0) + 1
-    warns[str(user_id)] = count
-    save_data(data)
-
-    if count >= CANHCAO_AUTO_SUT:
-        try:
-            await context.bot.ban_chat_member(update.effective_chat.id, user_id)
-        except Exception as e:
-            await update.effective_message.reply_text(f"❌ Lỗi khi sút / Error banning: {e}")
-            return
-        warns[str(user_id)] = 0
-        save_data(data)
-        await update.effective_message.reply_html(
-            f"🚫 {display} đã bị cảnh cáo đủ {CANHCAO_AUTO_SUT} lần và bị SÚT khỏi nhóm!\n"
-            f"🚫 {display} reached {CANHCAO_AUTO_SUT} warnings and was banned!"
-        )
-    else:
-        await update.effective_message.reply_html(
-            f"⚠️ Đã cảnh cáo {display} ({count}/{CANHCAO_AUTO_SUT}).\n"
-            f"⚠️ Warned {display} ({count}/{CANHCAO_AUTO_SUT})."
-        )
+    await update.effective_message.reply_text("⚠️ Lệnh /canhcao đang được phát triển")
 
 
 async def xoacanhcao_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    user_id, display, _ = await get_target_and_args(update, context)
-    if user_id is None:
-        await update.effective_message.reply_text(
-            "⚠️ Reply tin nhắn hoặc dùng /xoacanhcao <id/@username>.\n"
-            "⚠️ Reply to a message, or use /xoacanhcao <id/@username>."
-        )
-        return
+    await update.effective_message.reply_text("🧹 Lệnh /xoacanhcao đang được phát triển")
 
-    data = load_data()
-    chat_key = str(update.effective_chat.id)
-    warns = data.setdefault("warns", {}).setdefault(chat_key, {})
-    warns[str(user_id)] = 0
-    save_data(data)
-
-    await update.effective_message.reply_html(
-        f"✅ Đã xóa cảnh cáo của {display}.\n✅ Cleared warnings for {display}."
-    )
-
-
-# ---------------------------------------------------------------------------
-# Ghim / Bỏ ghim (pin / unpin)
-# ---------------------------------------------------------------------------
 
 async def ghim_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    message = update.effective_message
-    if not message.reply_to_message:
-        await message.reply_text(
-            "⚠️ Hãy reply tin nhắn cần ghim.\n⚠️ Reply to the message you want to pin."
-        )
-        return
-    try:
-        await context.bot.pin_chat_message(update.effective_chat.id, message.reply_to_message.message_id)
-    except Exception as e:
-        await message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-    await message.reply_text("📌 Đã ghim tin nhắn.\n📌 Message pinned.")
+    await update.effective_message.reply_text("📌 Lệnh /ghim đang được phát triển")
 
 
 async def boghim_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    message = update.effective_message
-    try:
-        if message.reply_to_message:
-            await context.bot.unpin_chat_message(update.effective_chat.id, message.reply_to_message.message_id)
-        else:
-            await context.bot.unpin_chat_message(update.effective_chat.id)
-    except Exception as e:
-        await message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-    await message.reply_text("📌 Đã bỏ ghim.\n📌 Message unpinned.")
+    await update.effective_message.reply_text("📌 Lệnh /boghim đang được phát triển")
 
-
-# ---------------------------------------------------------------------------
-# Thăng chức / Giáng chức (promote / demote)
-# ---------------------------------------------------------------------------
 
 async def thangchuc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    user_id, display, _ = await get_target_and_args(update, context)
-    if user_id is None:
-        await update.effective_message.reply_text(
-            "⚠️ Reply tin nhắn hoặc dùng /thangchuc <id/@username>.\n"
-            "⚠️ Reply to a message, or use /thangchuc <id/@username>."
-        )
-        return
-    try:
-        await context.bot.promote_chat_member(
-            update.effective_chat.id,
-            user_id,
-            can_manage_chat=True,
-            can_change_info=True,
-            can_delete_messages=True,
-            can_invite_users=True,
-            can_restrict_members=True,
-            can_pin_messages=True,
-            can_manage_video_chats=True,
-            can_promote_members=False,
-        )
-    except Exception as e:
-        await update.effective_message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-    await update.effective_message.reply_html(
-        f"⭐ Đã thăng chức {display} làm phó nhóm.\n⭐ Promoted {display} to admin."
-    )
+    await update.effective_message.reply_text("👑 Lệnh /thangchuc đang được phát triển")
 
 
 async def giangchuc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    user_id, display, _ = await get_target_and_args(update, context)
-    if user_id is None:
-        await update.effective_message.reply_text(
-            "⚠️ Reply tin nhắn hoặc dùng /giangchuc <id/@username>.\n"
-            "⚠️ Reply to a message, or use /giangchuc <id/@username>."
-        )
-        return
-    try:
-        await context.bot.promote_chat_member(
-            update.effective_chat.id,
-            user_id,
-            can_manage_chat=False,
-            can_change_info=False,
-            can_delete_messages=False,
-            can_invite_users=False,
-            can_restrict_members=False,
-            can_pin_messages=False,
-            can_manage_video_chats=False,
-            can_promote_members=False,
-        )
-    except Exception as e:
-        await update.effective_message.reply_text(f"❌ Lỗi / Error: {e}")
-        return
-    await update.effective_message.reply_html(
-        f"⬇️ Đã giáng chức {display} xuống thành viên thường.\n⬇️ Demoted {display} to member."
-    )
+    await update.effective_message.reply_text("👤 Lệnh /giangchuc đang được phát triển")
 
-
-# ---------------------------------------------------------------------------
-# Thông tin thành viên (user info)
-# ---------------------------------------------------------------------------
 
 async def thongtin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id, _display, _ = await get_target_and_args(update, context)
+    await update.effective_message.reply_text("ℹ️ Lệnh /thongtin đang được phát triển")
 
-    if user_id is None:
-        target = update.effective_user
-    else:
-        try:
-            member = await context.bot.get_chat_member(update.effective_chat.id, user_id)
-            target = member.user
-        except Exception:
-            await update.effective_message.reply_text(
-                "❌ Không tìm thấy thành viên.\n❌ Member not found."
-            )
-            return
-
-    username_line = f"@{target.username}" if target.username else "Không có / None"
-    text = (
-        f"👤 <b>Thông tin thành viên / User info</b>\n"
-        f"ID: <code>{target.id}</code>\n"
-        f"Tên / Name: {target.full_name}\n"
-        f"Username: {username_line}"
-    )
-    await update.effective_message.reply_html(text)
-
-
-# ---------------------------------------------------------------------------
-# Nội quy nhóm (group rules)
-# ---------------------------------------------------------------------------
 
 async def noiquy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_data()
-    chat_key = str(update.effective_chat.id)
-
-    if context.args:
+    if update.effective_chat.type in (Chat.GROUP, Chat.SUPERGROUP):
         if not await ensure_group_admin(update, context):
             return
-        rules_text = " ".join(context.args)
-        data.setdefault("rules", {})[chat_key] = rules_text
-        save_data(data)
-        await update.effective_message.reply_text(
-            "✅ Đã cập nhật nội quy nhóm.\n✅ Group rules updated."
-        )
-        return
+    await update.effective_message.reply_text("📝 Lệnh /noiquy đang được phát triển")
 
-    rules_text = data.get("rules", {}).get(chat_key)
-    if rules_text:
-        await update.effective_message.reply_text(f"📜 Nội quy nhóm / Group rules:\n\n{rules_text}")
-    else:
-        await update.effective_message.reply_text(
-            "📜 Nhóm chưa có nội quy. Admin dùng /noiquy <nội dung> để đặt.\n"
-            "📜 No rules set yet. Admin: /noiquy <text> to set rules."
-        )
-
-
-# ---------------------------------------------------------------------------
-# Xóa tin nhắn (delete message)
-# ---------------------------------------------------------------------------
 
 async def xoa_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_group_admin(update, context):
         return
-    message = update.effective_message
-    if not message.reply_to_message:
-        await message.reply_text(
-            "⚠️ Hãy reply tin nhắn cần xóa.\n⚠️ Reply to the message you want to delete."
-        )
-        return
-    try:
-        await context.bot.delete_message(update.effective_chat.id, message.reply_to_message.message_id)
-        await message.delete()
-    except Exception as e:
-        await message.reply_text(f"❌ Lỗi / Error: {e}")
-
-
-# ---------------------------------------------------------------------------
-# Chống phá nhóm: antilink / antispam / antibuff / antifake (bật/tắt)
-# ---------------------------------------------------------------------------
-
-async def _toggle_command(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str, ten_lenh: str, mo_ta: str):
-    if not await ensure_group_admin(update, context):
-        return
-    args = context.args
-    chat_id = update.effective_chat.id
-
-    if not args or args[0].lower() not in ("on", "off"):
-        state = get_settings(chat_id).get(key, False)
-        await update.effective_message.reply_text(
-            f"ℹ️ {mo_ta} hiện đang {'BẬT ✅' if state else 'TẮT ❌'}.\n"
-            f"Dùng /{ten_lenh} on hoặc /{ten_lenh} off để bật/tắt."
-        )
-        return
-
-    new_state = args[0].lower() == "on"
-    set_setting(chat_id, key, new_state)
-    await update.effective_message.reply_text(
-        f"{mo_ta}: đã chuyển sang {'BẬT ✅' if new_state else 'TẮT ❌'}."
-    )
+    await update.effective_message.reply_text("❌ Lệnh /xoa đang được phát triển")
 
 
 async def antilink_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _toggle_command(update, context, "antilink", "antilink", "🔗 Antilink (tự xóa tin nhắn chứa link)")
+    if not await ensure_group_admin(update, context):
+        return
+    await update.effective_message.reply_text("⛓️ Lệnh /antilink đang được phát triển")
 
 
 async def antispam_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _toggle_command(update, context, "antispam", "antispam", "🧹 Antispam (tự xóa tin nhắn spam lặp lại)")
+    if not await ensure_group_admin(update, context):
+        return
+    await update.effective_message.reply_text("📝 Lệnh /antispam đang được phát triển")
 
 
 async def antibuff_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _toggle_command(update, context, "antiflood", "antibuff", "🚨 Antibuff (tự câm mồm khi nhồi tin nhắn liên tục)")
+    if not await ensure_group_admin(update, context):
+        return
+    await update.effective_message.reply_text("💬 Lệnh /antibuff đang được phát triển")
 
 
 async def antifake_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _toggle_command(update, context, "antifake", "antifake", "🕵️ Antifake (cảnh báo nếu có người giả tên admin)")
-
-
-async def group_message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Chạy trên mọi tin nhắn văn bản (không phải lệnh) trong nhóm để lọc link/spam/flood."""
-    message = update.effective_message
-    chat = update.effective_chat
-    user = update.effective_user
-    if not message or not message.text or not user or user.is_bot:
+    if not await ensure_group_admin(update, context):
         return
-
-    settings = get_settings(chat.id)
-    if not (settings.get("antilink") or settings.get("antispam") or settings.get("antiflood")):
-        return  # không có gì bật, khỏi tốn công kiểm tra
-
-    # Admin thì bỏ qua, không áp dụng anti-abuse
-    try:
-        member = await context.bot.get_chat_member(chat.id, user.id)
-        if member.status in ("administrator", "creator"):
-            return
-    except Exception:
-        pass
-
-    now = datetime.now(timezone.utc).timestamp()
-    key = (chat.id, user.id)
-    history = _recent_messages.setdefault(key, [])
-    history.append((now, message.text))
-    cutoff = now - max(FLOOD_WINDOW_SECONDS, SPAM_WINDOW_SECONDS)
-    while history and history[0][0] < cutoff:
-        history.pop(0)
-
-    # --- antilink ---
-    if settings.get("antilink") and LINK_RE.search(message.text):
-        try:
-            await message.delete()
-            await chat.send_message(
-                f"🔗 Đã xóa tin nhắn chứa link của {user.mention_html()} (antilink).\n"
-                f"🔗 Removed a link message from {user.mention_html()} (antilink).",
-                parse_mode=ParseMode.HTML,
-            )
-        except Exception:
-            pass
-        return
-
-    # --- antispam (nội dung lặp lại) ---
-    if settings.get("antispam"):
-        repeats = [t for t, txt in history if now - t <= SPAM_WINDOW_SECONDS and txt == message.text]
-        if len(repeats) >= SPAM_REPEAT_THRESHOLD:
-            try:
-                await message.delete()
-                await chat.send_message(
-                    f"🧹 Đã xóa tin nhắn lặp lại của {user.mention_html()} (antispam).\n"
-                    f"🧹 Removed a repeated message from {user.mention_html()} (antispam).",
-                    parse_mode=ParseMode.HTML,
-                )
-            except Exception:
-                pass
-            return
-
-    # --- antibuff / antiflood (nhồi tin nhắn liên tục) ---
-    if settings.get("antiflood"):
-        flood_count = sum(1 for t, _ in history if now - t <= FLOOD_WINDOW_SECONDS)
-        if flood_count >= FLOOD_MAX_MESSAGES:
-            try:
-                until_date = datetime.now(timezone.utc) + timedelta(minutes=FLOOD_MUTE_MINUTES)
-                await context.bot.restrict_chat_member(
-                    chat.id, user.id, permissions=MUTED_PERMISSIONS, until_date=until_date
-                )
-                await chat.send_message(
-                    f"🚨 {user.mention_html()} gửi tin quá nhanh, đã bị câm mồm {FLOOD_MUTE_MINUTES} phút (antibuff).\n"
-                    f"🚨 {user.mention_html()} was flooding messages, muted for {FLOOD_MUTE_MINUTES} min (antibuff).",
-                    parse_mode=ParseMode.HTML,
-                )
-                history.clear()
-            except Exception:
-                pass
-
-
-# ---------------------------------------------------------------------------
-# Điểm danh hằng ngày (daily check-in streak)
-# ---------------------------------------------------------------------------
-
-def _today_str() -> str:
-    return datetime.now(VN_TZ).strftime("%Y-%m-%d")
+    await update.effective_message.reply_text("🕵️ Lệnh /antifake đang được phát triển")
 
 
 async def diemdanh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -839,8 +1102,8 @@ async def diemdanh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [[InlineKeyboardButton("✅ Điểm danh", callback_data=f"diemdanh:{user.id}")]]
     )
     await update.effective_message.reply_html(
-        f"📋 Chào {user.mention_html()}, vui lòng nhấn nút điểm danh để hệ thống xác nhận.\n"
-        f"📋 Hi {user.mention_html()}, please tap the check-in button below to confirm.",
+        f"📋 Chào {user.mention_html()}, vui lòng nhấn nút điểm danh để xác nhận.\n"
+        f"📋 Hi {user.mention_html()}, please tap the check-in button below.",
         reply_markup=keyboard,
     )
 
@@ -856,8 +1119,7 @@ async def diemdanh_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.from_user.id != owner_id:
         await query.answer(
-            "⚠️ Đây là nút điểm danh của người khác, không phải của bạn.\n"
-            "⚠️ This check-in button belongs to someone else.",
+            "⚠️ Đây là nút điểm danh của người khác, không phải của bạn.",
             show_alert=True,
         )
         return
@@ -869,106 +1131,60 @@ async def diemdanh_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     today = _today_str()
     if record["last_date"] == today:
-        await query.answer(
-            f"✅ Bạn đã điểm danh hôm nay rồi! Chuỗi hiện tại: {record['streak']} ngày.",
-            show_alert=True,
-        )
+        await query.answer(f"✅ Bạn đã điểm danh hôm nay! Streak: {record['streak']} 🔥", show_alert=True)
         return
 
     yesterday = (datetime.now(VN_TZ) - timedelta(days=1)).strftime("%Y-%m-%d")
     if record["last_date"] == yesterday:
         record["streak"] += 1
     else:
-        record["streak"] = 1  # bỏ lỡ ngày trước đó -> tính lại từ đầu
+        record["streak"] = 1
+
     record["last_date"] = today
     checkins[str(owner_id)] = record
     save_data(data)
 
-    await query.answer(
-        f"🎉 Điểm danh thành công! Chuỗi hiện tại: {record['streak']} ngày.", show_alert=True
-    )
+    await query.answer(f"🎉 Điểm danh thành công! Streak: {record['streak']} 🔥", show_alert=True)
     try:
         await query.edit_message_text(
-            f"📋 {query.from_user.mention_html()} đã điểm danh hôm nay ✅\n"
-            f"🔥 Chuỗi điểm danh / Streak: <b>{record['streak']}</b> ngày (days)",
+            f"📋 {query.from_user.mention_html()} đã điểm danh ✅\n🔥 Streak: <b>{record['streak']}</b> ngày",
             parse_mode=ParseMode.HTML,
         )
     except Exception:
         pass
 
 
-# ---------------------------------------------------------------------------
-# Chào mừng thành viên mới + phát hiện giả danh admin (antifake)
-# ---------------------------------------------------------------------------
-
-async def _check_new_member_impersonation(update: Update, context: ContextTypes.DEFAULT_TYPE, member):
-    """Nếu thành viên mới có tên trùng y hệt một admin -> nghi giả mạo, cảnh báo + tạm câm."""
-    chat = update.effective_chat
-    if not get_settings(chat.id).get("antifake", True):
-        return
-    try:
-        admins = await context.bot.get_chat_administrators(chat.id)
-    except Exception:
-        return
-
-    new_name = (member.full_name or "").strip().lower()
-    if not new_name:
-        return
-
-    for admin in admins:
-        if admin.user.id == member.id:
-            continue
-        admin_name = (admin.user.full_name or "").strip().lower()
-        if admin_name and admin_name == new_name:
-            try:
-                await context.bot.restrict_chat_member(chat.id, member.id, permissions=MUTED_PERMISSIONS)
-            except Exception:
-                pass
-            await chat.send_message(
-                f"🕵️ CẢNH BÁO: {member.mention_html()} có tên trùng với admin "
-                f"{admin.user.mention_html()} — nghi giả mạo, đã tạm câm mồm để admin kiểm tra (antifake).\n"
-                f"🕵️ WARNING: {member.mention_html()} has the same name as admin "
-                f"{admin.user.mention_html()} — possible impersonation, muted pending review (antifake).",
-                parse_mode=ParseMode.HTML,
-            )
-            return
-
-
-async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    for member in update.effective_message.new_chat_members:
-        if member.id == context.bot.id:
-            continue
-        await update.effective_chat.send_message(
-            f"👋 Chào mừng {member.mention_html()} đến với nhóm!\n"
-            f"👋 Welcome {member.mention_html()} to the group!",
-            parse_mode=ParseMode.HTML,
-        )
-        await _check_new_member_impersonation(update, context, member)
-
-
-# ---------------------------------------------------------------------------
-# Xử lý lỗi chung
-# ---------------------------------------------------------------------------
-
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Lỗi khi xử lý update %s: %s", update, context.error)
 
 
-# ---------------------------------------------------------------------------
-# Khởi chạy bot
-# ---------------------------------------------------------------------------
+# ============================================================
+# MAIN
+# ============================================================
 
 def main():
     token = BOT_TOKEN
     if not token or token == "PASTE_YOUR_TOKEN_HERE":
-        raise SystemExit(
-            "❌ Chưa dán BOT_TOKEN! Mở bot.py, tìm dòng BOT_TOKEN ở gần đầu file và dán token vào."
-        )
+        raise SystemExit("❌ Chưa dán BOT_TOKEN!")
 
     app = Application.builder().token(token).build()
 
-    app.add_handler(CommandHandler("start", start_command))
+    # Help & Casino commands
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("menuXu", menuXu_command))
+    app.add_handler(CommandHandler("xume", xume_command))
+    app.add_handler(CommandHandler("xumat", xumat_command))
+    app.add_handler(CommandHandler("taixiu", taixiu_command))
+    app.add_handler(CommandHandler("vaytien", vaytien_command))
+    app.add_handler(CommandHandler("nhapma", nhapma_command))
+    app.add_handler(CommandHandler("nhapcode", nhapcode_command))
+
+    # Filter commands
+    app.add_handler(CommandHandler("filter", filter_command))
+    app.add_handler(CommandHandler("filters", filters_command))
+    app.add_handler(CommandHandler("stop", stop_command))
+
+    # Admin commands
     app.add_handler(CommandHandler("cammom", cammom_command))
     app.add_handler(CommandHandler("mocammom", mocammom_command))
     app.add_handler(CommandHandler("sut", sut_command))
@@ -990,14 +1206,28 @@ def main():
     app.add_handler(CommandHandler("antibuff", antibuff_command))
     app.add_handler(CommandHandler("antifake", antifake_command))
     app.add_handler(CommandHandler("diemdanh", diemdanh_command))
+
+    # Callbacks
+    app.add_handler(CallbackQueryHandler(help_admin_callback, pattern="^help_admin$"))
+    app.add_handler(CallbackQueryHandler(help_utility_callback, pattern="^help_utility$"))
+    app.add_handler(CallbackQueryHandler(help_casino_callback, pattern="^help_casino$"))
+    app.add_handler(CallbackQueryHandler(back_to_help_callback, pattern="^help$"))
+    app.add_handler(CallbackQueryHandler(casino_admin_menu_callback, pattern="^casino_admin_menu$"))
+    app.add_handler(CallbackQueryHandler(casino_newbie_menu_callback, pattern="^casino_newbie_menu$"))
     app.add_handler(CallbackQueryHandler(diemdanh_callback, pattern=r"^diemdanh:"))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, group_message_guard))
+
+    # Message handler for filters
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
+        handle_filter_response
+    ))
+
     app.add_error_handler(error_handler)
 
-    logger.info("🤖 %s đang chạy...", BOT_NAME)
+    logger.info("🤖 %s v2 đang chạy...", BOT_NAME)
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
     main()
+
