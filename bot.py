@@ -446,7 +446,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         f"👋 Chào {user.mention_html()}, tôi là {BOT_NAME}.\n\n"
         f"🌟 Tôi có nhiều công cụ hữu ích. Chạm vào một module bên dưới để xem lệnh 💝\n\n"
-        f"🌍 Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸"
+        f"🌍 Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸 ✅"
     )
     
     await update.effective_message.reply_html(text, reply_markup=keyboard)
