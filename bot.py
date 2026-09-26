@@ -3872,6 +3872,620 @@ async def command_settings(
         )
     )
 
+# ============================================================
+# WARN
+# ============================================================
+
+async def command_warn(
+    message,
+    args
+):
+
+    if not await require_admin(message):
+        return
+
+    target = await resolve_target(
+        message,
+        args
+    )
+
+    if not await ensure_valid_target(
+        message,
+        target
+    ):
+        return
+
+    target_id = target.get("id")
+
+    reason = "Không có lý do"
+
+    if args:
+        parts = args.split()
+
+        if len(parts) > 1:
+            reason = " ".join(parts[1:])
+
+    await adb_execute(
+        """
+        INSERT INTO warns
+        (
+            chat_id,
+            user_id,
+            reason,
+            created_at
+        )
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            chat_id(message),
+            target_id,
+            reason,
+            datetime.now().isoformat()
+        )
+    )
+
+    row = await adb_execute(
+        """
+        SELECT COUNT(*) AS c
+        FROM warns
+        WHERE chat_id = ?
+        AND user_id = ?
+        """,
+        (
+            chat_id(message),
+            target_id
+        ),
+        fetchone=True
+    )
+
+    count = row["c"]
+
+    name = target.get("first_name") or "Thành viên"
+
+    await send_message(
+        chat_id(message),
+        (
+            "⚠️ <b>CẢNH CÁO</b>\n\n"
+            f"👤 {html.escape(name)}\n"
+            f"📌 Lý do: {html.escape(reason)}\n"
+            f"🔢 Số cảnh cáo: <code>{count}</code>"
+        ),
+        parse_mode="HTML"
+    )
+
+# ============================================================
+# BAN
+# ============================================================
+
+async def command_ban(
+    message,
+    args
+):
+
+    if not await require_admin(message):
+        return
+
+    if not await bot_is_admin(message):
+
+        await send_message(
+            chat_id(message),
+            "❌ Bot không có quyền ban thành viên."
+        )
+
+        return
+
+    target = await resolve_target(
+        message,
+        args
+    )
+
+    if not await ensure_valid_target(
+        message,
+        target
+    ):
+        return
+
+    duration = None
+
+    for part in args.split():
+
+        parsed = parse_duration(
+            part
+        )
+
+        if parsed is not None:
+
+            duration = parsed
+
+            break
+
+    data = {
+        "chat_id":
+            chat_id(message),
+
+        "user_id":
+            target.get("id"),
+
+        "revoke_messages":
+            True
+    }
+
+    if duration is not None:
+
+        data["until_date"] = int(
+            time.time()
+            + duration
+        )
+
+    result = await api(
+        "banChatMember",
+        data
+    )
+
+    if not result.get("ok"):
+
+        await send_message(
+            chat_id(message),
+            (
+                "❌ Không thể ban.\n"
+                f"ℹ️ {html.escape(result.get('description', 'Unknown'))}"
+            )
+        )
+
+        return
+
+    duration_text = (
+        format_duration(duration)
+        if duration
+        else "Vĩnh viễn"
+    )
+
+    await send_message(
+        chat_id(message),
+        (
+            "🔨 <b>ĐÃ BAN</b>\n\n"
+            f"👤 {mention_user(target)}\n"
+            f"⏱ Thời gian: "
+            f"<code>{duration_text}</code>"
+        ),
+        parse_mode="HTML"
+    )
+
+# ============================================================
+# UNBAN
+# ============================================================
+
+async def command_unban(
+    message,
+    args
+):
+
+    if not await require_admin(message):
+        return
+
+    if not await bot_is_admin(message):
+
+        await send_message(
+            chat_id(message),
+            "❌ Bot không có quyền unban."
+        )
+
+        return
+
+    target = await resolve_target(
+        message,
+        args
+    )
+
+    if not await ensure_valid_target(
+        message,
+        target
+    ):
+        return
+
+    result = await api(
+        "unbanChatMember",
+        {
+            "chat_id": chat_id(message),
+            "user_id": target.get("id"),
+            "only_if_banned": False
+        }
+    )
+
+    if not result.get("ok"):
+
+        await send_message(
+            chat_id(message),
+            "❌ Không thể unban.\n"
+            "Có thể người này chưa bị ban hoặc Bot không đủ quyền."
+        )
+
+        return
+
+    name = (
+        target.get("username")
+        or target.get("first_name")
+        or str(target.get("id"))
+    )
+
+    await send_message(
+        chat_id(message),
+        f"✅ Đã unban <b>{name}</b>.",
+        parse_mode="HTML"
+    )
+
+# ============================================================
+# KICK
+# ============================================================
+
+async def command_kick(message, args=""):
+
+    if not is_group(message):
+        await send_message(
+            chat_id(message),
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    if not await is_admin(message):
+        await send_message(
+            chat_id(message),
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+        return
+
+    target_id = None
+
+    reply = message.get("reply_to_message")
+
+    if reply:
+        target_id = user_id(reply.get("from"))
+
+    if not target_id and args:
+        value = args.split()[0]
+
+        if value.startswith("@"):
+            target_id = await resolve_username(value)
+
+        elif value.isdigit():
+            target_id = int(value)
+
+    if not target_id:
+        await send_message(
+            chat_id(message),
+            "❌ Hãy reply tin nhắn người cần kick hoặc dùng:\n"
+            "<code>/kick @username</code>\n"
+            "<code>/kick user_id</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    if target_id == user_id(message):
+        await send_message(
+            chat_id(message),
+            "❌ Bạn không thể tự kick chính mình."
+        )
+        return
+
+    target = await get_chat_member(
+        chat_id(message),
+        target_id
+    )
+
+    if not target:
+        await send_message(
+            chat_id(message),
+            "❌ Không tìm thấy thành viên này."
+        )
+        return
+
+    if target.get("status") in {
+        "creator",
+        "administrator"
+    }:
+        await send_message(
+            chat_id(message),
+            "❌ Không thể kick quản trị viên hoặc chủ nhóm."
+        )
+        return
+
+    result = await api(
+        "banChatMember",
+        {
+            "chat_id": chat_id(message),
+            "user_id": target_id
+        }
+    )
+
+    if not result.get("ok"):
+        await send_message(
+            chat_id(message),
+            "❌ Không thể kick người này.\n"
+            "Hãy kiểm tra quyền của Ngọc Mỹ."
+        )
+        return
+
+    await api(
+        "unbanChatMember",
+        {
+            "chat_id": chat_id(message),
+            "user_id": target_id,
+            "only_if_banned": True
+        }
+    )
+
+    await send_message(
+        chat_id(message),
+        f"👢 Đã kick <code>{target_id}</code> khỏi nhóm.",
+        parse_mode="HTML"
+    )
+
+# ============================================================
+# WARNS
+# ============================================================
+
+async def command_warns(message, args=""):
+
+    if not is_group(message):
+        await send_message(
+            chat_id(message),
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    target_id = None
+
+    reply = message.get("reply_to_message")
+
+    if reply:
+        target_id = user_id(reply.get("from"))
+
+    if not target_id and args:
+        value = args.split()[0]
+
+        if value.startswith("@"):
+            target_id = await resolve_username(value)
+        elif value.isdigit():
+            target_id = int(value)
+
+    if not target_id:
+        target_id = user_id(message)
+
+    rows = await adb_execute(
+        """
+        SELECT reason, created_at
+        FROM warns
+        WHERE chat_id = ?
+          AND user_id = ?
+        ORDER BY created_at DESC
+        """,
+        (chat_id(message), target_id),
+        fetch=True
+    )
+
+    count = len(rows)
+
+    lines = [
+        "⚠️ <b>WARN CỦA THÀNH VIÊN</b>",
+        "",
+        f"👤 User ID: <code>{target_id}</code>",
+        f"⚠️ Số cảnh cáo: <b>{count}</b>",
+        ""
+    ]
+
+    if not rows:
+        lines.append("✅ Thành viên này chưa có cảnh cáo.")
+    else:
+        lines.append("<b>Danh sách cảnh cáo:</b>")
+        for i, row in enumerate(rows, 1):
+            reason = row["reason"] or "Không có lý do"
+            created = row["created_at"] or ""
+            lines.append(
+                f"{i}. {reason} — <code>{created}</code>"
+            )
+
+    await send_message(
+        chat_id(message),
+        "\n".join(lines),
+        parse_mode="HTML"
+    )
+
+# ============================================================
+# MUTE
+# ============================================================
+
+async def command_mute(message, args=""):
+
+    if not is_group(message):
+        await send_message(
+            chat_id(message),
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    if not await is_admin(message):
+        await send_message(
+            chat_id(message),
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+        return
+
+    target_id = None
+
+    reply = message.get("reply_to_message")
+
+    if reply:
+        target_id = user_id(reply.get("from"))
+
+    if not target_id and args:
+        value = args.split()[0]
+
+        if value.startswith("@"):
+            target_id = await resolve_username(value)
+        elif value.isdigit():
+            target_id = int(value)
+
+    if not target_id:
+        await send_message(
+            chat_id(message),
+            "❌ Reply tin nhắn người cần mute hoặc dùng "
+            "<code>/mute @username</code> / <code>/mute user_id</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    if target_id == user_id(message):
+        await send_message(
+            chat_id(message),
+            "❌ Không thể tự mute chính mình."
+        )
+        return
+
+    target = await get_chat_member(
+        chat_id(message),
+        target_id
+    )
+
+    if not target:
+        await send_message(
+            chat_id(message),
+            "❌ Không tìm thấy thành viên này."
+        )
+        return
+
+    if target.get("status") in {
+        "creator",
+        "administrator"
+    }:
+        await send_message(
+            chat_id(message),
+            "❌ Không thể mute quản trị viên hoặc chủ nhóm."
+        )
+        return
+
+    result = await api(
+        "restrictChatMember",
+        {
+            "chat_id": chat_id(message),
+            "user_id": target_id,
+            "permissions": {
+                "can_send_messages": False,
+                "can_send_audios": False,
+                "can_send_documents": False,
+                "can_send_photos": False,
+                "can_send_videos": False,
+                "can_send_video_notes": False,
+                "can_send_voice_notes": False,
+                "can_send_polls": False,
+                "can_send_other_messages": False,
+                "can_add_web_page_previews": False
+            }
+        }
+    )
+
+    if not result.get("ok"):
+        await send_message(
+            chat_id(message),
+            "❌ Không thể mute người này.\n"
+            "Hãy kiểm tra quyền của Ngọc Mỹ."
+        )
+        return
+
+    await send_message(
+        chat_id(message),
+        f"🔇 Đã mute <code>{target_id}</code>.",
+        parse_mode="HTML"
+    )
+
+# ============================================================
+# UNMUTE
+# ============================================================
+
+async def command_unmute(message, args=""):
+
+    if not is_group(message):
+        await send_message(
+            chat_id(message),
+            "sao ngươi lại ngu thế lệnh này chỉ xài cho nhóm"
+        )
+        return
+
+    if not await is_admin(message):
+        await send_message(
+            chat_id(message),
+            "❌ Chỉ quản trị viên mới được dùng lệnh này."
+        )
+        return
+
+    target_id = None
+
+    reply = message.get("reply_to_message")
+
+    if reply:
+        target_id = user_id(reply.get("from"))
+
+    if not target_id and args:
+        value = args.split()[0]
+
+        if value.startswith("@"):
+            target_id = await resolve_username(value)
+        elif value.isdigit():
+            target_id = int(value)
+
+    if not target_id:
+        await send_message(
+            chat_id(message),
+            "❌ Reply tin nhắn người cần unmute hoặc dùng "
+            "<code>/unmute @username</code> / <code>/unmute user_id</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    target = await get_chat_member(
+        chat_id(message),
+        target_id
+    )
+
+    if not target:
+        await send_message(
+            chat_id(message),
+            "❌ Không tìm thấy thành viên này."
+        )
+        return
+
+    result = await api(
+        "restrictChatMember",
+        {
+            "chat_id": chat_id(message),
+            "user_id": target_id,
+            "permissions": {
+                "can_send_messages": True,
+                "can_send_audios": True,
+                "can_send_documents": True,
+                "can_send_photos": True,
+                "can_send_videos": True,
+                "can_send_video_notes": True,
+                "can_send_voice_notes": True,
+                "can_send_polls": True,
+                "can_send_other_messages": True,
+                "can_add_web_page_previews": True
+            }
+        }
+    )
+
+    if not result.get("ok"):
+        await send_message(
+            chat_id(message),
+            "❌ Không thể unmute người này.\n"
+            "Hãy kiểm tra quyền của Ngọc Mỹ."
+        )
+        return
+
+    await send_message(
+        chat_id(message),
+        f"🔊 Đã unmute <code>{target_id}</code>.",
+        parse_mode="HTML"
+    )
 
 # ============================================================
 # COMMAND TABLE
@@ -3917,6 +4531,13 @@ COMMAND_HANDLERS = {
     "leveldanhsach": command_leveldanhsach,
     "levelnhiemvu": command_levelnhiemvu,
     "noichu": command_noichu,
+    "warn": command_warn,
+    "warns": command_warns,
+    "ban": command_ban,
+    "unban": command_unban,
+    "kick": command_kick,
+    "mute": command_mute,
+    "unmute": command_unmute,
 }
 
 
@@ -5013,13 +5634,129 @@ async def dispatch_command(
 # /purge /pin /unpin /lock /unlock
 # ============================================================
 
+# ============================================================
+# CHECK BOT ADMIN
+# ============================================================
 
+async def bot_is_admin(message):
+
+    member = await get_chat_member(
+        chat_id(message),
+        (await api("getMe")).get(
+            "result",
+            {}
+        ).get("id")
+    )
+
+    if not member:
+        return False
+
+    return member.get("status") in {
+        "administrator",
+        "creator"
+    }
+
+# ============================================================
+# WARN
+# ============================================================
+
+async def command_warn(
+    message,
+    args
+):
+
+    if not await require_admin(message):
+        return
+
+    target = await resolve_target(
+        message,
+        args
+    )
+
+    if not await ensure_valid_target(
+        message,
+        target
+    ):
+        return
+
+    target_id = target.get("id")
+
+    reason = ""
+
+    if args:
+        parts = args.split()
+
+        if parts:
+            first = parts[0]
+
+            if (
+                first.startswith("@")
+                or re.fullmatch(
+                    r"-?\d+",
+                    first
+                )
+            ):
+                reason = " ".join(
+                    parts[1:]
+                )
+
+    if not reason:
+        reason = "Không có lý do"
+
+    await adb_execute(
+        """
+        INSERT INTO warns
+        (
+            chat_id,
+            user_id,
+            reason,
+            created_at
+        )
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            chat_id(message),
+            target_id,
+            reason,
+            datetime.now(
+                timezone.utc
+            ).isoformat()
+        )
+    )
+
+    row = await adb_execute(
+        """
+        SELECT COUNT(*) AS c
+        FROM warns
+        WHERE chat_id = ?
+        AND user_id = ?
+        """,
+        (
+            chat_id(message),
+            target_id
+        ),
+        fetchone=True
+    )
+
+    count = row["c"]
+
+    await send_message(
+        chat_id(message),
+        (
+            "⚠️ <b>CẢNH CÁO</b>\n\n"
+            f"👤 {mention_user(target)}\n"
+            f"📌 Lý do: "
+            f"{html.escape(reason)}\n"
+            f"🔢 Số cảnh cáo: "
+            f"<code>{count}</code>"
+        ),
+        parse_mode="HTML"
+    )
 
 # ============================================================
 # MUTE
 # Telegram restrictChatMember
 # ============================================================
-
 async def command_mute(
     message,
     args
