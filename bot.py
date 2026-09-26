@@ -4487,6 +4487,36 @@ async def command_unmute(message, args=""):
         parse_mode="HTML"
     )
 
+async def resolve_target(message, args=""):
+    """
+    Lấy user cần xử lý từ:
+    - Reply tin nhắn
+    - @username
+    - user_id
+    """
+
+    # Reply
+    reply = message.get("reply_to_message")
+
+    if reply:
+        target_user = reply.get("from") or {}
+        target_id = target_user.get("id")
+
+        if target_id:
+            return int(target_id)
+
+    # @username hoặc user_id
+    if args:
+        value = args.split()[0].strip()
+
+        if value.startswith("@"):
+            return await resolve_username(value)
+
+        if value.isdigit():
+            return int(value)
+
+    return None
+
 # ============================================================
 # COMMAND TABLE
 # ============================================================
