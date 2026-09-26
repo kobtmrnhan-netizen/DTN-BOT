@@ -786,8 +786,10 @@ async def casino_admin_menu_callback(update: Update, context: ContextTypes.DEFAU
         "🔐 **PHẦN MỀM ADMIN**\n\n"
         "👤 Nhập mã đề vào trạng thái admin\n\n"
         "Cách nhập: `/nhapma [code]`\n\n"
-        "⚠️ Mã admin không được chia sẻ công khai!"
+        "⚠️ Nhập Riêng Tư Với BOT không nhập trên nhóm"
+        "Nhắn riêng với ownen : @DTN_207 để được cấp mã"
     )
+    
     
     await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
 
@@ -801,7 +803,7 @@ async def casino_newbie_menu_callback(update: Update, context: ContextTypes.DEFA
         "🆕 **CODE TÂN THỦ**\n\n"
         "Chào bạn đến chỗ nhập code!\n\n"
         "Cách nhập: `/nhapcode [code]`\n\n"
-        "💝 Code tân thủ có thể được chia sẻ cho mọi người!"
+        "💝 Code sẽ được phát ở nhóm trong tiểu sử BOT!"
     )
     
     await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
@@ -1185,122 +1187,455 @@ async def handle_filter_response(update: Update, context: ContextTypes.DEFAULT_T
 # ============================================================
 
 async def cammom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Câm người dùng"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("🔇 Lệnh /cammom đang được phát triển")
+    
+    user_id, user_html, args = await get_target_and_args(update, context)
+    if not user_id:
+        return
+    
+    duration = None
+    if args:
+        duration = parse_duration(args[0])
+    
+    try:
+        await context.bot.restrict_chat_member(
+            update.effective_chat.id, user_id, permissions=MUTED_PERMISSIONS, until_date=duration
+        )
+        time_str = f"trong {args[0]}" if args else "vĩnh viễn"
+        await update.effective_message.reply_html(
+            f"🔇 {user_html} đã bị câm {time_str}!"
+        )
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
 
 
 async def mocammom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Uncam người dùng"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("🔊 Lệnh /mocammom đang được phát triển")
+    
+    user_id, user_html, args = await get_target_and_args(update, context)
+    if not user_id:
+        return
+    
+    try:
+        await context.bot.restrict_chat_member(
+            update.effective_chat.id, user_id, permissions=FULL_PERMISSIONS
+        )
+        await update.effective_message.reply_html(
+            f"🔊 {user_html} đã được uncam!"
+        )
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
 
 
 async def sut_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cấm người dùng"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("🚫 Lệnh /sut đang được phát triển")
+    
+    user_id, user_html, args = await get_target_and_args(update, context)
+    if not user_id:
+        return
+    
+    duration = None
+    if args:
+        duration = parse_duration(args[0])
+    
+    try:
+        await context.bot.ban_chat_member(
+            update.effective_chat.id, user_id, until_date=duration
+        )
+        time_str = f"trong {args[0]}" if args else "vĩnh viễn"
+        await update.effective_message.reply_html(
+            f"🚫 {user_html} đã bị cấm {time_str}!"
+        )
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
 
 
 async def mosut_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Hỏi cấm người dùng"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("✅ Lệnh /mosut đang được phát triển")
+    
+    user_id, user_html, args = await get_target_and_args(update, context)
+    if not user_id:
+        return
+    
+    try:
+        await context.bot.unban_chat_member(update.effective_chat.id, user_id)
+        await update.effective_message.reply_html(
+            f"✅ {user_html} đã được hỏi cấm!"
+        )
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
 
 
 async def da_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Kick người dùng"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("🦶 Lệnh /da đang được phát triển")
+    
+    user_id, user_html, args = await get_target_and_args(update, context)
+    if not user_id:
+        return
+    
+    try:
+        await context.bot.ban_chat_member(update.effective_chat.id, user_id)
+        await context.bot.unban_chat_member(update.effective_chat.id, user_id)
+        await update.effective_message.reply_html(
+            f"🦶 {user_html} đã bị kick khỏi nhóm!"
+        )
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
 
 
 async def khoa_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Khóa nhóm - chỉ admin nói được"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("🔒 Lệnh /khoa đang được phát triển")
+    
+    try:
+        await context.bot.restrict_chat_member(
+            update.effective_chat.id,
+            update.effective_user.id,
+            permissions=FULL_PERMISSIONS
+        )
+        await context.bot.set_chat_permissions(
+            update.effective_chat.id, permissions=MUTED_PERMISSIONS
+        )
+        await update.effective_message.reply_html(
+            "🔒 Nhóm đã bị khóa! Chỉ admin có thể nói chuyện."
+        )
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
 
 
 async def mokhoa_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mở khóa nhóm"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("🔓 Lệnh /mokhoa đang được phát triển")
+    
+    try:
+        await context.bot.set_chat_permissions(
+            update.effective_chat.id, permissions=FULL_PERMISSIONS
+        )
+        await update.effective_message.reply_html(
+            "🔓 Nhóm đã được mở khóa! Mọi người có thể nói chuyện bình thường."
+        )
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
 
 
 async def canhcao_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cảnh cáo người dùng"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("⚠️ Lệnh /canhcao đang được phát triển")
+    
+    user_id, user_html, args = await get_target_and_args(update, context)
+    if not user_id:
+        return
+    
+    reason = " ".join(args) if args else "Không nêu lý do"
+    
+    data = load_data()
+    warns = data.setdefault("warns", {}).setdefault(str(update.effective_chat.id), {})
+    warn_count = warns.get(str(user_id), 0) + 1
+    warns[str(user_id)] = warn_count
+    save_data(data)
+    
+    await update.effective_message.reply_html(
+        f"⚠️ {user_html} đã nhận cảnh cáo!\n\n"
+        f"Lý do: {reason}\n"
+        f"Cảnh cáo: {warn_count}/{CANHCAO_AUTO_SUT}"
+    )
+    
+    if warn_count >= CANHCAO_AUTO_SUT:
+        try:
+            await context.bot.ban_chat_member(update.effective_chat.id, user_id)
+            await update.effective_message.reply_html(
+                f"🚫 {user_html} đã bị cấm vì nhận đủ {CANHCAO_AUTO_SUT} cảnh cáo!"
+            )
+        except Exception:
+            pass
 
 
 async def xoacanhcao_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reset cảnh cáo"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("🧹 Lệnh /xoacanhcao đang được phát triển")
+    
+    user_id, user_html, args = await get_target_and_args(update, context)
+    if not user_id:
+        return
+    
+    data = load_data()
+    warns = data.setdefault("warns", {}).setdefault(str(update.effective_chat.id), {})
+    warns[str(user_id)] = 0
+    save_data(data)
+    
+    await update.effective_message.reply_html(
+        f"🧹 Cảnh cáo của {user_html} đã được xóa!"
+    )
 
 
 async def ghim_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ghim tin nhắn"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("📌 Lệnh /ghim đang được phát triển")
+    
+    if update.effective_message.reply_to_message:
+        try:
+            await context.bot.pin_chat_message(
+                update.effective_chat.id,
+                update.effective_message.reply_to_message.message_id,
+                disable_notification=True
+            )
+            await update.effective_message.reply_html("📌 Tin nhắn đã được ghim!")
+        except Exception as e:
+            await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
+    else:
+        await update.effective_message.reply_text("❌ Vui lòng reply tin nhắn cần ghim")
 
 
 async def boghim_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bỏ ghim tin nhắn"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("📌 Lệnh /boghim đang được phát triển")
+    
+    if update.effective_message.reply_to_message:
+        try:
+            await context.bot.unpin_chat_message(
+                update.effective_chat.id,
+                update.effective_message.reply_to_message.message_id
+            )
+            await update.effective_message.reply_html("📌 Tin nhắn đã được bỏ ghim!")
+        except Exception as e:
+            await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
+    else:
+        await update.effective_message.reply_text("❌ Vui lòng reply tin nhắn cần bỏ ghim")
 
 
 async def thangchuc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Thăng chức admin"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("👑 Lệnh /thangchuc đang được phát triển")
+    
+    user_id, user_html, args = await get_target_and_args(update, context)
+    if not user_id:
+        return
+    
+    try:
+        await context.bot.promote_chat_member(
+            update.effective_chat.id, user_id,
+            can_delete_messages=True,
+            can_restrict_members=True,
+            can_promote_members=True,
+            can_manage_chat=True
+        )
+        await update.effective_message.reply_html(
+            f"👑 {user_html} đã được thăng chức admin!"
+        )
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
 
 
 async def giangchuc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Giáng chức admin"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("👤 Lệnh /giangchuc đang được phát triển")
+    
+    user_id, user_html, args = await get_target_and_args(update, context)
+    if not user_id:
+        return
+    
+    try:
+        await context.bot.promote_chat_member(
+            update.effective_chat.id, user_id,
+            can_delete_messages=False,
+            can_restrict_members=False,
+            can_promote_members=False,
+            can_manage_chat=False
+        )
+        await update.effective_message.reply_html(
+            f"👤 {user_html} đã bị giáng chức!"
+        )
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
 
 
 async def thongtin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.effective_message.reply_text("ℹ️ Lệnh /thongtin đang được phát triển")
+    """Xem thông tin người dùng"""
+    user_id, user_html, args = await get_target_and_args(update, context)
+    if not user_id:
+        return
+    
+    try:
+        member = await context.bot.get_chat_member(update.effective_chat.id, user_id)
+        user = member.user
+        
+        status_map = {
+            "creator": "👑 Chủ nhóm",
+            "administrator": "🛡️ Admin",
+            "member": "👤 Thành viên",
+            "restricted": "⛔ Bị hạn chế",
+            "left": "➡️ Rời nhóm",
+            "kicked": "🚫 Bị kick"
+        }
+        
+        status = status_map.get(member.status, "❓ Không xác định")
+        
+        text = (
+            f"ℹ️ <b>THÔNG TIN NGƯỜI DÙNG</b>\n\n"
+            f"👤 <b>Tên:</b> {user_html}\n"
+            f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
+            f"📱 <b>Username:</b> @{user.username if user.username else 'Không có'}\n"
+            f"<b>Trạng thái:</b> {status}\n"
+            f"🤖 <b>Bot:</b> {'✅ Có' if user.is_bot else '❌ Không'}"
+        )
+        
+        await update.effective_message.reply_html(text)
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
 
 
 async def noiquy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type in (Chat.GROUP, Chat.SUPERGROUP):
+    """Xem/đặt nội quy nhóm"""
+    if update.effective_chat.type not in (Chat.GROUP, Chat.SUPERGROUP):
+        await update.effective_message.reply_text("Lệnh chỉ xài trong nhóm")
+        return
+    
+    chat = update.effective_chat
+    
+    if context.args:
+        # Đặt nội quy
         if not await ensure_group_admin(update, context):
             return
-    await update.effective_message.reply_text("📝 Lệnh /noiquy đang được phát triển")
+        
+        rules = " ".join(context.args)
+        data = load_data()
+        data.setdefault("rules", {})[str(chat.id)] = rules
+        save_data(data)
+        
+        await update.effective_message.reply_html(
+            f"✅ Nội quy nhóm đã được cập nhật:\n\n{rules}"
+        )
+    else:
+        # Xem nội quy
+        data = load_data()
+        rules = data.get("rules", {}).get(str(chat.id))
+        
+        if rules:
+            await update.effective_message.reply_html(
+                f"📝 <b>NỘI QUY NHÓM</b>\n\n{rules}"
+            )
+        else:
+            await update.effective_message.reply_text(
+                "❌ Nhóm này chưa có nội quy! Admin vui lòng đặt bằng:\n"
+                "/noiquy [nội quy của bạn]"
+            )
 
 
 async def xoa_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Xóa tin nhắn"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("❌ Lệnh /xoa đang được phát triển")
+    
+    if update.effective_message.reply_to_message:
+        try:
+            await update.effective_message.reply_to_message.delete()
+            await update.effective_message.delete()
+        except Exception as e:
+            await update.effective_message.reply_text(f"❌ Lỗi: {str(e)}")
+    else:
+        await update.effective_message.reply_text("❌ Vui lòng reply tin nhắn cần xóa")
 
 
 async def antilink_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bật/tắt chặn link"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("⛓️ Lệnh /antilink đang được phát triển")
+    
+    if not context.args or context.args[0].lower() not in ("on", "off"):
+        current = get_settings(update.effective_chat.id).get("antilink")
+        await update.effective_message.reply_text(
+            f"⛓️ Antilink hiện: {'✅ BẬT' if current else '❌ TẮT'}\n"
+            f"Dùng: /antilink on hoặc /antilink off"
+        )
+        return
+    
+    status = context.args[0].lower() == "on"
+    set_setting(update.effective_chat.id, "antilink", status)
+    
+    await update.effective_message.reply_html(
+        f"⛓️ Antilink đã {'✅ BẬT' if status else '❌ TẮT'}"
+    )
 
 
 async def antispam_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bật/tắt chặn spam"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("📝 Lệnh /antispam đang được phát triển")
+    
+    if not context.args or context.args[0].lower() not in ("on", "off"):
+        current = get_settings(update.effective_chat.id).get("antispam")
+        await update.effective_message.reply_text(
+            f"📝 Antispam hiện: {'✅ BẬT' if current else '❌ TẮT'}\n"
+            f"Dùng: /antispam on hoặc /antispam off"
+        )
+        return
+    
+    status = context.args[0].lower() == "on"
+    set_setting(update.effective_chat.id, "antispam", status)
+    
+    await update.effective_message.reply_html(
+        f"📝 Antispam đã {'✅ BẬT' if status else '❌ TẮT'}"
+    )
 
 
 async def antibuff_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bật/tắt chặn nhồi tin"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("💬 Lệnh /antibuff đang được phát triển")
+    
+    if not context.args or context.args[0].lower() not in ("on", "off"):
+        current = get_settings(update.effective_chat.id).get("antiflood")
+        await update.effective_message.reply_text(
+            f"💬 Antibuff hiện: {'✅ BẬT' if current else '❌ TẮT'}\n"
+            f"Dùng: /antibuff on hoặc /antibuff off"
+        )
+        return
+    
+    status = context.args[0].lower() == "on"
+    set_setting(update.effective_chat.id, "antiflood", status)
+    
+    await update.effective_message.reply_html(
+        f"💬 Antibuff đã {'✅ BẬT' if status else '❌ TẮT'}"
+    )
 
 
 async def antifake_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bật/tắt chặn giả danh"""
     if not await ensure_group_admin(update, context):
         return
-    await update.effective_message.reply_text("🕵️ Lệnh /antifake đang được phát triển")
+    
+    if not context.args or context.args[0].lower() not in ("on", "off"):
+        current = get_settings(update.effective_chat.id).get("antifake")
+        await update.effective_message.reply_text(
+            f"🕵️ Antifake hiện: {'✅ BẬT' if current else '❌ TẮT'}\n"
+            f"Dùng: /antifake on hoặc /antifake off"
+        )
+        return
+    
+    status = context.args[0].lower() == "on"
+    set_setting(update.effective_chat.id, "antifake", status)
+    
+    await update.effective_message.reply_html(
+        f"🕵️ Antifake đã {'✅ BẬT' if status else '❌ TẮT'}"
+    )
 
 
 async def diemdanh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
