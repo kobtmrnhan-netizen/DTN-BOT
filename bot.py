@@ -431,25 +431,27 @@ def _today_str() -> str:
 # ============================================================
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Hiển thị menu help chính với 3 nút lớn"""
+    """Hiển thị menu help chính với 3 nút lớn - nằm ngang"""
     user = update.effective_user
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🛡️ Quản Trị", callback_data="help_admin"),
             InlineKeyboardButton("🛠️ Tiện Ích", callback_data="help_utility"),
-        ],
-        [
-            InlineKeyboardButton("🎰 Nhà Cái Osaka", callback_data="help_casino"),
+            InlineKeyboardButton("🎰 Nhà Cái", callback_data="help_casino"),
         ]
     ])
     
     text = (
         f"👋 Chào {user.mention_html()}, tôi là {BOT_NAME}.\n\n"
         f"🌟 Tôi có nhiều công cụ hữu ích. Chạm vào một module bên dưới để xem lệnh 💝\n\n"
-        f"🌍 Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸 ✅"
+        f"🌍 Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸"
     )
     
-    await update.effective_message.reply_html(text, reply_markup=keyboard)
+    # Nếu từ callback thì edit, nếu từ command thì reply
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+    else:
+        await update.effective_message.reply_html(text, reply_markup=keyboard)
 
 
 async def help_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -459,23 +461,18 @@ async def help_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("❌ Xóa tin nhắn", callback_data="admin_xoa"),
+            InlineKeyboardButton("❌ Xóa tin", callback_data="admin_xoa"),
             InlineKeyboardButton("🔇 Câm/Uncam", callback_data="admin_cammom"),
-        ],
-        [
             InlineKeyboardButton("🚫 Cấm/Hỏi cấm", callback_data="admin_sut"),
-            InlineKeyboardButton("🦶 Kick", callback_data="admin_da"),
         ],
         [
-            InlineKeyboardButton("🔒 Khóa/Mở nhóm", callback_data="admin_khoa"),
+            InlineKeyboardButton("🦶 Kick", callback_data="admin_da"),
+            InlineKeyboardButton("🔒 Khóa/Mở", callback_data="admin_khoa"),
             InlineKeyboardButton("⚠️ Cảnh cáo", callback_data="admin_canhcao"),
         ],
         [
             InlineKeyboardButton("📌 Ghim/Bỏ ghim", callback_data="admin_ghim"),
-            InlineKeyboardButton("👤 Thăng/Giáng chức", callback_data="admin_chuc"),
-        ],
-        [
-            InlineKeyboardButton("🛡️ Anti-abuse", callback_data="admin_anti"),
+            InlineKeyboardButton("👑 Thăng/Giáng", callback_data="admin_chuc"),
         ],
         [
             InlineKeyboardButton("🔙 Quay lại", callback_data="help"),
@@ -483,31 +480,31 @@ async def help_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     ])
     
     text = (
-        "🛡️ **LỆNH QUẢN TRỊ NHÓM**\n\n"
-        "📌 **/xoa** - Xóa tin nhắn\n"
-        "🔇 **/cammom** <@user|id> [thời gian] - Câm người dùng\n"
-        "🔊 **/mocammom** <@user|id> - Uncam\n"
-        "🚫 **/sut** <@user|id> [thời gian] - Cấm người dùng\n"
-        "✅ **/mosut** <@user|id> - Hỏi cấm\n"
-        "🦶 **/da** <@user|id> - Kick người dùng\n"
-        "🔒 **/khoa** - Khóa nhóm (chỉ admin nói được)\n"
-        "🔓 **/mokhoa** - Mở nhóm\n"
-        "⚠️ **/canhcao** <@user|id> [lý do] - Cảnh cáo\n"
-        "🧹 **/xoacanhcao** <@user|id> - Reset cảnh cáo\n"
-        "📌 **/ghim** <message_id> - Ghim tin nhắn\n"
-        "📌 **/boghim** <message_id> - Bỏ ghim\n"
-        "👑 **/thangchuc** <@user|id> - Thăng chức admin\n"
-        "👤 **/giangchuc** <@user|id> - Giáng chức\n"
-        "ℹ️ **/thongtin** <@user|id> - Xem info người dùng\n"
-        "📝 **/noiquy** - Xem/đặt nội quy nhóm\n"
-        "⛓️ **/antilink** [on|off] - Chặn link\n"
-        "📝 **/antispam** [on|off] - Chặn spam\n"
-        "💬 **/antibuff** [on|off] - Chặn nhồi tin\n"
-        "🕵️ **/antifake** [on|off] - Chặn giả danh\n\n"
-        "💡 *Sử dụng:* Reply tin nhắn hoặc `/lệnh @username` hoặc `/lệnh [user_id]`"
+        "🛡️ <b>LỆNH QUẢN TRỊ NHÓM</b>\n\n"
+        "✅ <b>/xoa</b> - Xóa tin nhắn\n"
+        "✅ <b>/cammom</b> &lt;@user|id&gt; [thời gian] - Câm người dùng\n"
+        "✅ <b>/mocammom</b> &lt;@user|id&gt; - Uncam\n"
+        "✅ <b>/sut</b> &lt;@user|id&gt; [thời gian] - Cấm người dùng\n"
+        "✅ <b>/mosut</b> &lt;@user|id&gt; - Hỏi cấm\n"
+        "✅ <b>/da</b> &lt;@user|id&gt; - Kick người dùng\n"
+        "✅ <b>/khoa</b> - Khóa nhóm (chỉ admin nói được)\n"
+        "✅ <b>/mokhoa</b> - Mở nhóm\n"
+        "✅ <b>/canhcao</b> &lt;@user|id&gt; [lý do] - Cảnh cáo\n"
+        "✅ <b>/xoacanhcao</b> &lt;@user|id&gt; - Reset cảnh cáo\n"
+        "✅ <b>/ghim</b> &lt;message_id&gt; - Ghim tin nhắn\n"
+        "✅ <b>/boghim</b> &lt;message_id&gt; - Bỏ ghim\n"
+        "✅ <b>/thangchuc</b> &lt;@user|id&gt; - Thăng chức admin\n"
+        "✅ <b>/giangchuc</b> &lt;@user|id&gt; - Giáng chức\n"
+        "✅ <b>/thongtin</b> &lt;@user|id&gt; - Xem info người dùng\n"
+        "✅ <b>/noiquy</b> - Xem/đặt nội quy nhóm\n"
+        "✅ <b>/antilink</b> [on|off] - Chặn link\n"
+        "✅ <b>/antispam</b> [on|off] - Chặn spam\n"
+        "✅ <b>/antibuff</b> [on|off] - Chặn nhồi tin\n"
+        "✅ <b>/antifake</b> [on|off] - Chặn giả danh\n\n"
+        "💡 <i>Sử dụng:</i> Reply tin nhắn hoặc <code>/lệnh @username</code> hoặc <code>/lệnh [user_id]</code>"
     )
     
-    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 async def help_utility_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -519,8 +516,6 @@ async def help_utility_callback(update: Update, context: ContextTypes.DEFAULT_TY
         [
             InlineKeyboardButton("📋 Điểm danh", callback_data="util_diemdanh"),
             InlineKeyboardButton("🔍 Filter", callback_data="util_filter"),
-        ],
-        [
             InlineKeyboardButton("ℹ️ Thông tin", callback_data="util_info"),
         ],
         [
@@ -529,19 +524,19 @@ async def help_utility_callback(update: Update, context: ContextTypes.DEFAULT_TY
     ])
     
     text = (
-        "🛠️ **LỆNH TIỆN ÍCH**\n\n"
-        "📋 **/diemdanh** - Điểm danh hằng ngày, giữ streak\n"
-        "📝 **/filter** <từ_khóa> <phản_hồi> - Thêm filter tự động\n"
-        "📖 **/filters** - Xem tất cả filter\n"
-        "🛑 **/stop** <từ_khóa> - Xóa filter\n"
-        "ℹ️ **/thongtin** <@user|id> - Xem thông tin người dùng\n\n"
-        "💡 *Ví dụ:*\n"
-        "`/filter xin hello` - Khi ai nhắn 'xin', bot trả lời 'hello'\n"
-        "`/filters` - Xem tất cả\n"
-        "`/stop xin` - Xóa filter 'xin'"
+        "🛠️ <b>LỆNH TIỆN ÍCH</b>\n\n"
+        "✅ <b>/diemdanh</b> - Điểm danh hằng ngày, giữ streak\n"
+        "✅ <b>/filter</b> &lt;từ_khóa&gt; &lt;phản_hồi&gt; - Thêm filter tự động\n"
+        "✅ <b>/filters</b> - Xem tất cả filter\n"
+        "✅ <b>/stop</b> &lt;từ_khóa&gt; - Xóa filter\n"
+        "✅ <b>/thongtin</b> &lt;@user|id&gt; - Xem thông tin người dùng\n\n"
+        "💡 <b>Ví dụ:</b>\n"
+        "<code>/filter xin hello</code> - Khi ai nhắn 'xin', bot trả lời 'hello'\n"
+        "<code>/filters</code> - Xem tất cả\n"
+        "<code>/stop xin</code> - Xóa filter 'xin'"
     )
     
-    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 async def help_casino_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -553,8 +548,6 @@ async def help_casino_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         [
             InlineKeyboardButton("💰 Số XU", callback_data="casino_xu"),
             InlineKeyboardButton("🎲 Tài Xỉu", callback_data="casino_taixiu"),
-        ],
-        [
             InlineKeyboardButton("💳 Vay tiền", callback_data="casino_vaytien"),
         ],
         [
@@ -563,15 +556,15 @@ async def help_casino_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     ])
     
     text = (
-        "🎰 **NHÀ CÁI OSAKA**\n\n"
-        "🎮 Chơi tài xỉu, kiếm & mất XU!\n\n"
-        "💰 **/xume** - Kiểm tra số XU hiện có\n"
-        "📉 **/xumat** - Xem số XU đã thua\n"
-        "🎲 **/taixiu** <số_xu> <tài|xỉu> - Chơi tài xỉu\n"
-        "💳 **/vaytien** <số_tiền> - Vay tiền chơi (tối đa 500,000 XU)\n"
-        "🔐 **/nhapma** <code> - Nhập mã admin\n"
-        "🆕 **/nhapcode** <code> - Nhập code newbie\n\n"
-        "⚠️ *Quy tắc:*\n"
+        "🎰 <b>NHÀ CÁI OSAKA</b>\n\n"
+        "🎮 Chơi tài xỉu, kiếm &amp; mất XU!\n\n"
+        "✅ <b>/xume</b> - Kiểm tra số XU hiện có\n"
+        "✅ <b>/xumat</b> - Xem số XU đã thua\n"
+        "✅ <b>/taixiu</b> &lt;số_xu&gt; &lt;tài|xỉu&gt; - Chơi tài xỉu\n"
+        "✅ <b>/vaytien</b> &lt;số_tiền&gt; - Vay tiền chơi (tối đa 500,000 XU)\n"
+        "✅ <b>/nhapma</b> &lt;code&gt; - Nhập mã admin\n"
+        "✅ <b>/nhapcode</b> &lt;code&gt; - Nhập code newbie\n\n"
+        "⚠️ <b>Quy tắc:</b>\n"
         "• Tài/Xỉu thắng: x2 tiền cược\n"
         "• Tài thắng 40%, Xỉu thắng 40% (50% hòa)\n"
         "• Vay tiền tối đa: 500,000 XU\n"
@@ -579,12 +572,178 @@ async def help_casino_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         "• Quá hạn không trả = Khóa chơi"
     )
     
-    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 async def back_to_help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Quay lại menu chính"""
-    await help_command(update, context)
+    """Quay lại menu chính - Edit message cũ"""
+    query = update.callback_query
+    await query.answer()
+    
+    user = update.effective_user
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🛡️ Quản Trị", callback_data="help_admin"),
+            InlineKeyboardButton("🛠️ Tiện Ích", callback_data="help_utility"),
+            InlineKeyboardButton("🎰 Nhà Cái", callback_data="help_casino"),
+        ]
+    ])
+    
+    text = (
+        f"👋 Chào {user.mention_html()}, tôi là {BOT_NAME}.\n\n"
+        f"🌟 Tôi có nhiều công cụ hữu ích. Chạm vào một module bên dưới để xem lệnh 💝\n\n"
+        f"🌍 Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸"
+    )
+    
+    # Nếu từ callback thì edit, nếu từ command thì reply
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+    else:
+        await update.effective_message.reply_html(text, reply_markup=keyboard)
+
+
+async def help_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menu quản trị"""
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("❌ Xóa tin", callback_data="admin_xoa"),
+            InlineKeyboardButton("🔇 Câm/Uncam", callback_data="admin_cammom"),
+            InlineKeyboardButton("🚫 Cấm/Hỏi cấm", callback_data="admin_sut"),
+        ],
+        [
+            InlineKeyboardButton("🦶 Kick", callback_data="admin_da"),
+            InlineKeyboardButton("🔒 Khóa/Mở", callback_data="admin_khoa"),
+            InlineKeyboardButton("⚠️ Cảnh cáo", callback_data="admin_canhcao"),
+        ],
+        [
+            InlineKeyboardButton("📌 Ghim/Bỏ ghim", callback_data="admin_ghim"),
+            InlineKeyboardButton("👑 Thăng/Giáng", callback_data="admin_chuc"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Quay lại", callback_data="help"),
+        ]
+    ])
+    
+    text = (
+        "🛡️ <b>LỆNH QUẢN TRỊ NHÓM</b>\n\n"
+        "✅ <b>/xoa</b> - Xóa tin nhắn\n"
+        "✅ <b>/cammom</b> &lt;@user|id&gt; [thời gian] - Câm người dùng\n"
+        "✅ <b>/mocammom</b> &lt;@user|id&gt; - Uncam\n"
+        "✅ <b>/sut</b> &lt;@user|id&gt; [thời gian] - Cấm người dùng\n"
+        "✅ <b>/mosut</b> &lt;@user|id&gt; - Hỏi cấm\n"
+        "✅ <b>/da</b> &lt;@user|id&gt; - Kick người dùng\n"
+        "✅ <b>/khoa</b> - Khóa nhóm (chỉ admin nói được)\n"
+        "✅ <b>/mokhoa</b> - Mở nhóm\n"
+        "✅ <b>/canhcao</b> &lt;@user|id&gt; [lý do] - Cảnh cáo\n"
+        "✅ <b>/xoacanhcao</b> &lt;@user|id&gt; - Reset cảnh cáo\n"
+        "✅ <b>/ghim</b> &lt;message_id&gt; - Ghim tin nhắn\n"
+        "✅ <b>/boghim</b> &lt;message_id&gt; - Bỏ ghim\n"
+        "✅ <b>/thangchuc</b> &lt;@user|id&gt; - Thăng chức admin\n"
+        "✅ <b>/giangchuc</b> &lt;@user|id&gt; - Giáng chức\n"
+        "✅ <b>/thongtin</b> &lt;@user|id&gt; - Xem info người dùng\n"
+        "✅ <b>/noiquy</b> - Xem/đặt nội quy nhóm\n"
+        "✅ <b>/antilink</b> [on|off] - Chặn link\n"
+        "✅ <b>/antispam</b> [on|off] - Chặn spam\n"
+        "✅ <b>/antibuff</b> [on|off] - Chặn nhồi tin\n"
+        "✅ <b>/antifake</b> [on|off] - Chặn giả danh\n\n"
+        "💡 <i>Sử dụng:</i> Reply tin nhắn hoặc <code>/lệnh @username</code> hoặc <code>/lệnh [user_id]</code>"
+    )
+    
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
+async def help_utility_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menu tiện ích"""
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📋 Điểm danh", callback_data="util_diemdanh"),
+            InlineKeyboardButton("🔍 Filter", callback_data="util_filter"),
+            InlineKeyboardButton("ℹ️ Thông tin", callback_data="util_info"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Quay lại", callback_data="help"),
+        ]
+    ])
+    
+    text = (
+        "🛠️ <b>LỆNH TIỆN ÍCH</b>\n\n"
+        "✅ <b>/diemdanh</b> - Điểm danh hằng ngày, giữ streak\n"
+        "✅ <b>/filter</b> &lt;từ_khóa&gt; &lt;phản_hồi&gt; - Thêm filter tự động\n"
+        "✅ <b>/filters</b> - Xem tất cả filter\n"
+        "✅ <b>/stop</b> &lt;từ_khóa&gt; - Xóa filter\n"
+        "✅ <b>/thongtin</b> &lt;@user|id&gt; - Xem thông tin người dùng\n\n"
+        "💡 <b>Ví dụ:</b>\n"
+        "<code>/filter xin hello</code> - Khi ai nhắn 'xin', bot trả lời 'hello'\n"
+        "<code>/filters</code> - Xem tất cả\n"
+        "<code>/stop xin</code> - Xóa filter 'xin'"
+    )
+    
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
+async def help_casino_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menu nhà cái"""
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("💰 Số XU", callback_data="casino_xu"),
+            InlineKeyboardButton("🎲 Tài Xỉu", callback_data="casino_taixiu"),
+            InlineKeyboardButton("💳 Vay tiền", callback_data="casino_vaytien"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Quay lại", callback_data="help"),
+        ]
+    ])
+    
+    text = (
+        "🎰 <b>NHÀ CÁI OSAKA</b>\n\n"
+        "🎮 Chơi tài xỉu, kiếm &amp; mất XU!\n\n"
+        "✅ <b>/xume</b> - Kiểm tra số XU hiện có\n"
+        "✅ <b>/xumat</b> - Xem số XU đã thua\n"
+        "✅ <b>/taixiu</b> &lt;số_xu&gt; &lt;tài|xỉu&gt; - Chơi tài xỉu\n"
+        "✅ <b>/vaytien</b> &lt;số_tiền&gt; - Vay tiền chơi (tối đa 500,000 XU)\n"
+        "✅ <b>/nhapma</b> &lt;code&gt; - Nhập mã admin\n"
+        "✅ <b>/nhapcode</b> &lt;code&gt; - Nhập code newbie\n\n"
+        "⚠️ <b>Quy tắc:</b>\n"
+        "• Tài/Xỉu thắng: x2 tiền cược\n"
+        "• Tài thắng 40%, Xỉu thắng 40% (50% hòa)\n"
+        "• Vay tiền tối đa: 500,000 XU\n"
+        "• Thời hạn trả nợ: 5 giờ\n"
+        "• Quá hạn không trả = Khóa chơi"
+    )
+    
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
+async def back_to_help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Quay lại menu chính - Edit message cũ"""
+    query = update.callback_query
+    await query.answer()
+    
+    user = update.effective_user
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🛡️ Quản Trị", callback_data="help_admin"),
+            InlineKeyboardButton("🛠️ Tiện Ích", callback_data="help_utility"),
+            InlineKeyboardButton("🎰 Nhà Cái", callback_data="help_casino"),
+        ]
+    ])
+    
+    text = (
+        f"👋 Chào {user.mention_html()}, tôi là {BOT_NAME}.\n\n"
+        f"🌟 Tôi có nhiều công cụ hữu ích. Chạm vào một module bên dưới để xem lệnh 💝\n\n"
+        f"🌍 Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸"
+    )
+    
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 # ============================================================
@@ -820,9 +979,33 @@ async def vaytien_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def nhapma_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Nhập mã admin - Nhận vô hạn xu"""
+    """Nhập mã admin - Nhận vô hạn xu (riêng tư)"""
     user = update.effective_user
     
+    # Nếu gõ trong nhóm, chuyển hướng sang riêng tư
+    if update.effective_chat.type in (Chat.GROUP, Chat.SUPERGROUP):
+        try:
+            await context.bot.send_message(
+                chat_id=user.id,
+                text=(
+                    "🔐 <b>PHẦN MỀM ADMIN</b>\n\n"
+                    "Bạn đã gõ /nhapma trong nhóm!\n\n"
+                    "⚠️ Vui lòng gõ lại `/nhapma [mã]` <b>trong DM này</b> để nhập mã admin.\n\n"
+                    "💡 Để bảo mật, mã admin chỉ được xử lý trong tin nhắn riêng tư."
+                ),
+                parse_mode=ParseMode.HTML
+            )
+            await update.effective_message.reply_html(
+                f"📨 {user.mention_html()}, mình đã gửi tin nhắn riêng tư cho bạn!\n"
+                f"Vui lòng kiểm tra DM và nhập mã trong đó."
+            )
+        except Exception as e:
+            await update.effective_message.reply_text(
+                "❌ Không thể gửi DM! Vui lòng mở tin nhắn riêng tư với bot trước."
+            )
+        return
+    
+    # Xử lý trong DM (chat riêng)
     if not context.args:
         await update.effective_message.reply_text("❌ Cách dùng: `/nhapma [mã]`")
         return
@@ -832,13 +1015,14 @@ async def nhapma_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if code == admin_code:
         set_user_admin(user.id, True)
-        set_user_xu(user.id, 999999999)  # Vô hạn xu (gần như)
+        set_user_xu(user.id, 999999999)  # Vô hạn xu
         
         await update.effective_message.reply_html(
             f"✅ <b>CHÍNH XÁC!</b>\n\n"
-            f"🔓 {user.mention_html()} đã trở thành <b>ADMIN</b>!\n"
+            f"🔓 Bạn đã trở thành <b>ADMIN</b>!\n"
             f"💎 Nhận được: <b>999,999,999 XU</b> (Vô hạn)\n"
-            f"👑 Bạn giờ có quyền tối cao!"
+            f"👑 Bạn giờ có quyền tối cao!\n\n"
+            f"🌟 Quay lại nhóm để sử dụng quyền admin của bạn!"
         )
     else:
         await update.effective_message.reply_html(
@@ -849,11 +1033,24 @@ async def nhapma_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def nhapcode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Nhập code newbie - Nhận 100.000 xu"""
+    """Nhập code newbie - Nhận 100.000 xu (hiện công khai)"""
     user = update.effective_user
     
     if not context.args:
-        await update.effective_message.reply_text("❌ Cách dùng: `/nhapcode [code]`")
+        # Nếu không có args, hiển thị code công khai
+        if update.effective_chat.type in (Chat.GROUP, Chat.SUPERGROUP):
+            await update.effective_message.reply_html(
+                f"🆕 <b>CODE TÂN THỦ</b>\n\n"
+                f"📢 <b>Code công khai cho mọi người:</b>\n\n"
+                f"<code>tanthunewbie</code>\n\n"
+                f"💝 Nhận: <b>+100,000 XU</b>\n"
+                f"✅ Dùng lệnh: <code>/nhapcode tanthunewbie</code>"
+            )
+        else:
+            await update.effective_message.reply_text(
+                "❌ Cách dùng: `/nhapcode [code]`\n"
+                "Hoặc gõ `/nhapcode` để xem code tân thủ"
+            )
         return
     
     code = " ".join(context.args)
@@ -877,13 +1074,23 @@ async def nhapcode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         set_user_xu(user.id, new_xu)
         add_code_used(user.id, "newbie")
         
-        await update.effective_message.reply_html(
-            f"✅ <b>CHÍNH XÁC!</b>\n\n"
-            f"🎉 {user.mention_html()} nhập code tân thủ thành công!\n"
-            f"💝 Nhận được: <b>+100,000 XU</b>\n"
-            f"💰 XU hiện tại: <b>{new_xu:,}</b>\n\n"
-            f"🎮 Sẵn sàng chơi? Gõ `/taixiu [xu] [tài/xỉu]`"
-        )
+        # Hiển thị công khai trong nhóm hoặc riêng tư trong DM
+        if update.effective_chat.type in (Chat.GROUP, Chat.SUPERGROUP):
+            await update.effective_message.reply_html(
+                f"✅ <b>CHÍNH XÁC!</b>\n\n"
+                f"🎉 {user.mention_html()} nhập code tân thủ thành công!\n"
+                f"💝 Nhận được: <b>+100,000 XU</b>\n"
+                f"💰 XU hiện tại: <b>{new_xu:,}</b>\n\n"
+                f"🎮 Sẵn sàng chơi? Gõ `/taixiu [xu] [tài/xỉu]`"
+            )
+        else:
+            await update.effective_message.reply_html(
+                f"✅ <b>CHÍNH XÁC!</b>\n\n"
+                f"🎉 {user.mention_html()} nhập code tân thủ thành công!\n"
+                f"💝 Nhận được: <b>+100,000 XU</b>\n"
+                f"💰 XU hiện tại: <b>{new_xu:,}</b>\n\n"
+                f"🎮 Sẵn sàng chơi? Gõ `/taixiu [xu] [tài/xỉu]`"
+            )
     else:
         await update.effective_message.reply_html(
             f"❌ <b>Bạn Nhập Sai!</b>\n\n"
