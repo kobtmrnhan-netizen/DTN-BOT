@@ -4517,6 +4517,44 @@ async def resolve_target(message, args=""):
 
     return None
 
+async def ensure_valid_target(message, target_id):
+    if not target_id:
+        await send_message(
+            chat_id(message),
+            "❌ Không tìm thấy người dùng cần xử lý."
+        )
+        return None
+
+    target = await get_chat_member(
+        chat_id(message),
+        target_id
+    )
+
+    if not target:
+        await send_message(
+            chat_id(message),
+            "❌ Không tìm thấy thành viên này."
+        )
+        return None
+
+    status = target.get("status")
+
+    if status == "creator":
+        await send_message(
+            chat_id(message),
+            "❌ Không thể xử lý chủ nhóm."
+        )
+        return None
+
+    if status == "administrator":
+        await send_message(
+            chat_id(message),
+            "❌ Không thể xử lý quản trị viên."
+        )
+        return None
+
+    return target
+
 # ============================================================
 # COMMAND TABLE
 # ============================================================
