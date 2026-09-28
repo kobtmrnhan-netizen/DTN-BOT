@@ -430,33 +430,20 @@ def _today_str() -> str:
 # HELP MENU & NAVIGATION
 # ============================================================
 
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lệnh /start - Hướng dẫn dùng /help"""
+    await update.effective_message.reply_text(
+        "Tôi Chỉ Hoạt Động khi bạn rõ lệnh /help"
+    )
+
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Hiển thị menu chính với tất cả lệnh"""
+    """Hiển thị menu chính với 4 nút"""
     user = update.effective_user
     
     text = (
         f"👋 Chào {user.mention_html()}, tôi là {BOT_NAME}.\n\n"
-        f"📚 <b>DANH SÁCH ĐẦY ĐỦ CÁC LỆNH:</b>\n\n"
-        
-        f"<b>🛡️ QUẢN TRỊ NHÓM:</b>\n"
-        f"✅ /xoa • /cammom • /mocammom • /sut • /mosut • /da\n"
-        f"✅ /khoa • /mokhoa • /canhcao • /xoacanhcao • /ghim • /boghim\n"
-        f"✅ /thangchuc • /giangchuc • /thongtin • /noiquy\n"
-        f"✅ /antilink • /antispam • /antibuff • /antifake\n"
-        f"✅ /ghostban • /welcome • /goodbye • /wordfilter\n"
-        f"✅ /muteall • /unmuteall • /ticket\n\n"
-        
-        f"<b>🛠️ TIỆN ÍCH:</b>\n"
-        f"✅ /diemdanh • /filter • /filters • /stop\n"
-        f"✅ /translate • /report • /faq • /kb • /links\n\n"
-        
-        f"<b>📊 THỐNG KÊ:</b>\n"
-        f"✅ /stats • /growth • /analytics • /peakhours\n\n"
-        
-        f"<b>🎰 NHÀ CÁI OSAKA:</b>\n"
-        f"✅ /menuXu • /xume • /xumat • /taixiu • /vaytien • /tratien\n"
-        f"✅ /nhapma • /nhapcode\n\n"
-        
+        f"🌟 Tôi có nhiều công cụ hữu ích. Chạm vào một module bên dưới để xem lệnh 💝\n\n"
         f"🌍 Tôi hỗ trợ Tiếng Việt 🇻🇳 và English 🇺🇸"
     )
     
@@ -2400,7 +2387,8 @@ def main():
 
     app = Application.builder().token(token).build()
 
-    # Help & Casino commands
+    # Help & Start commands
+    app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("menuXu", menuXu_command))
     app.add_handler(CommandHandler("xume", xume_command))
