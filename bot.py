@@ -233,6 +233,29 @@ def remove_filter(chat_id: int, trigger: str) -> None:
     if str(chat_id) in data.get("filters", {}):
         data["filters"][str(chat_id)].pop(trigger.lower(), None)
     save_data(data)
+# ============================================================
+# CAM SYSTEM (xoá tin nhắn liên tục)
+# ============================================================
+def get_cam_list(chat_id) -> list:
+    """Danh sách user bị cam trong nhóm"""
+    data = load_data()
+    return data.get("cam_list", {}).get(str(chat_id), [])
+
+
+def add_cam(chat_id, user_id: int) -> None:
+    data = load_data()
+    cam_list = data.setdefault("cam_list", {}).setdefault(str(chat_id), [])
+    if user_id not in cam_list:
+        cam_list.append(user_id)
+    save_data(data)
+
+
+def remove_cam(chat_id, user_id: int) -> None:
+    data = load_data()
+    cam_list = data.get("cam_list", {}).get(str(chat_id), [])
+    if user_id in cam_list:
+        cam_list.remove(user_id)
+    save_data(data)
 def parse_duration(text: str):
     if not text:
         return None
@@ -314,6 +337,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("🛠️ Tiện Ích", callback_data="help_utility")],
         [InlineKeyboardButton("📊 Thống Kê", callback_data="help_stats"),
          InlineKeyboardButton("🎰 Nhà Cái", callback_data="help_casino")],
+        [InlineKeyboardButton("🕌 Cộng Đồng", callback_data="help_community"),
+         InlineKeyboardButton("⭐ Give Stars", callback_data="help_givestars")],
     ])
     if update.callback_query:
         await update.callback_query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
@@ -341,6 +366,9 @@ async def help_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             InlineKeyboardButton("👑 Thăng/Giáng", callback_data="admin_chuc"),
         ],
         [
+            InlineKeyboardButton("🔕 Cam (Xóa tin)", callback_data="admin_cam"),
+        ],
+        [
             InlineKeyboardButton("☰ Menu", callback_data="help"),
             InlineKeyboardButton("🔙 Quay lại", callback_data="help"),
         ]
@@ -350,6 +378,8 @@ async def help_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         "🛡️ <b>LỆNH QUẢN TRỊ NHÓM</b>\n\n"
         "✅ <b>/xoa</b> - Xóa tin nhắn\n"
         "✅ <b>/cammom</b> &lt;@user|id&gt; [thời gian] - Câm người dùng\n"
+        "✅ <b>/cam</b> &lt;@user|id&gt; - Cam (xoá mọi tin nhắn)\n"
+        "✅ <b>/cam1</b> &lt;@user|id&gt; - Bỏ cam\n"
         "✅ <b>/mocammom</b> &lt;@user|id&gt; - Uncam\n"
         "✅ <b>/sut</b> &lt;@user|id&gt; [thời gian] - Cấm người dùng\n"
         "✅ <b>/mosut</b> &lt;@user|id&gt; - Hỏi cấm\n"
@@ -451,6 +481,45 @@ async def help_utility_callback(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
     await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+async def help_community_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cộng đồng Studio Osaka"""
+    query = update.callback_query
+    await query.answer()
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("☰ Menu", callback_data="help")],
+    ])
+
+    text = (
+        "🌟 <b>CỘNG ĐỒNG ANH EM STUDIO BOT OSAKA</b>\n\n"
+        "1. 👑 <b>Owner:</b> @Nobicuol\n"
+        "2. 🛠️ <b>Nhà Phát Triển:</b> @DTN_207\n"
+        "3. ⚡ <b>Admin tạm thời:</b> @tranthitram\n"
+        "4. 📢 <b>Đang tuyển</b> - IB Owner\n"
+        "5. 📢 <b>Đang tuyển</b> - IB Owner\n\n"
+        "💝 <i>Cộng đồng Osaka luôn chào đón bạn đến</i>"
+    )
+
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
+async def help_givestars_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ủng hộ sao (Star)"""
+    query = update.callback_query
+    await query.answer()
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("☰ Menu", callback_data="help")],
+    ])
+
+    text = (
+        "⭐ <b>ỦNG HỘ SAO (STAR)</b>\n\n"
+        "Nếu bạn muốn ủng hộ sao (Star) thì bạn hãy done vào tài khoản:\n\n"
+        "1. 👑 <b>@Nobicuol</b>\n\n"
+        "🙏 Cảm ơn bạn đã ủng hộ góp phần phát triển cực mạnh cho bot! 💝"
+    )
+
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 async def help_casino_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Menu nhà cái"""
     query = update.callback_query
@@ -498,6 +567,7 @@ async def help_placeholder_callback(update: Update, context: ContextTypes.DEFAUL
     hints = {
         "admin_xoa":      "/xoa (reply tin nhắn cần xóa)",
         "admin_cammom":   "/cammom @user [thời gian]",
+        "admin_cam":      "/cam @user hoặc /cam1 @user",
         "admin_sut":      "/sut @user [thời gian]",
         "admin_da":       "/da @user",
         "admin_khoa":     "/khoa hoặc /mokhoa",
@@ -1354,6 +1424,81 @@ async def nhapcode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"❌ <b>Bạn Nhập Sai!</b>\n\n"
             f"Hãy vào Nhóm Telegram để có Code"
         )
+# ============================================================
+# LỆNH /cam VÀ /cam1
+# ============================================================
+async def cam_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bật cam - xoá mọi tin nhắn của mục tiêu"""
+    if not await ensure_group_admin(update, context):
+        return
+
+    # Check bot có quyền xoá tin nhắn
+    try:
+        bot_member = await context.bot.get_chat_member(update.effective_chat.id, context.bot.id)
+        has_delete = (
+            bot_member.status in ("creator",)
+            or (bot_member.status == "administrator" and getattr(bot_member, "can_delete_messages", False))
+        )
+        if not has_delete:
+            await update.effective_message.reply_html(
+                "❌ <b>Bot cần quyền XOÁ TIN NHẮN để dùng lệnh này!</b>\n\n"
+                "👉 Vào cài đặt nhóm → Quản trị viên → cấp quyền Xoá tin nhắn cho bot."
+            )
+            return
+    except Exception as e:
+        await update.effective_message.reply_text(f"❌ Không kiểm tra được quyền bot: {e}")
+        return
+
+    user_id, user_html, _ = await get_target_and_args(update, context)
+    if not user_id:
+        return
+
+    add_cam(update.effective_chat.id, user_id)
+    await update.effective_message.reply_html(
+        f"🔕 <b>ĐÃ BẬT CAM!</b>\n\n"
+        f"👤 Mục tiêu: {user_html}\n"
+        f"🚫 Mọi tin nhắn của họ sẽ bị <b>xoá tự động</b> liên tục.\n"
+        f"💡 Tắt bằng: <code>/cam1 {user_id}</code>"
+    )
+
+async def cam1_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Tắt cam - cho phép mục tiêu nhắn bình thường"""
+    if not await ensure_group_admin(update, context):
+        return
+
+    user_id, user_html, _ = await get_target_and_args(update, context)
+    if not user_id:
+        return
+
+    remove_cam(update.effective_chat.id, user_id)
+    await update.effective_message.reply_html(
+        f"🔔 <b>ĐÃ TẮT CAM!</b>\n\n"
+        f"👤 Mục tiêu: {user_html}\n"
+        f"✅ Tin nhắn không còn bị xoá."
+    )
+
+
+async def handle_cam_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Tự động xoá tin nhắn của user bị cam"""
+    if not update.effective_message or not update.effective_user:
+        return
+    if update.effective_chat.type not in (Chat.GROUP, Chat.SUPERGROUP):
+        return
+
+    # Admin của nhóm không bị cam (bảo vệ)
+    try:
+        member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
+        if member.status in ("administrator", "creator"):
+            return
+    except Exception:
+        pass
+
+    cam_list = get_cam_list(update.effective_chat.id)
+    if update.effective_user.id in cam_list:
+        try:
+            await update.effective_message.delete()
+        except Exception:
+            pass
 async def ghostban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cấm lặng lẽ - người không biết mình bị cấm"""
     if not await ensure_group_admin(update, context):
@@ -2029,6 +2174,9 @@ def main():
     app.add_handler(CommandHandler("growth", growth_command))
     app.add_handler(CommandHandler("analytics", analytics_command))
     app.add_handler(CommandHandler("peakhours", peakhours_command))
+    # CAM commands (mới)
+    app.add_handler(CommandHandler("cam", cam_command))
+    app.add_handler(CommandHandler("cam1", cam1_command))
 
     app.add_handler(CommandHandler("diemdanh", diemdanh_command))
 
@@ -2041,12 +2189,23 @@ def main():
     app.add_handler(CallbackQueryHandler(casino_admin_menu_callback, pattern="^casino_admin_menu$"))
     app.add_handler(CallbackQueryHandler(casino_newbie_menu_callback, pattern="^casino_newbie_menu$"))
     app.add_handler(CallbackQueryHandler(diemdanh_callback, pattern=r"^diemdanh:"))
+    app.add_handler(CallbackQueryHandler(help_community_callback, pattern="^help_community$"))
+    app.add_handler(CallbackQueryHandler(help_givestars_callback, pattern="^help_givestars$"))
 
     # ✅ FIX: 18 nút trước đây bấm vào loading quay mãi
     app.add_handler(CallbackQueryHandler(
         help_placeholder_callback,
-        pattern=r"^(admin_xoa|admin_cammom|admin_sut|admin_da|admin_khoa|admin_canhcao|admin_ghim|admin_chuc|util_diemdanh|util_filter|util_info|casino_xu|casino_taixiu|casino_vaytien|stats_view|growth_view|analytics_view|peak_view)$"
+        pattern=r"^(admin_xoa|admin_cammom|admin_cam|admin_sut|admin_da|admin_khoa|admin_canhcao|admin_ghim|admin_chuc|util_diemdanh|util_filter|util_info|casino_xu|casino_taixiu|casino_vaytien|stats_view|growth_view|analytics_view|peak_view)$"
     ))
+
+    # CAM delete handler — group=-1 để chạy ưu tiên trước
+    app.add_handler(
+    MessageHandler(
+        filters.ChatType.GROUPS & ~filters.StatusUpdate.ALL,
+        handle_cam_delete
+    ),
+    group=-1,
+)
 
     # Message handler for filters
     app.add_handler(MessageHandler(
